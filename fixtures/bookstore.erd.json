@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "title": "Bookstore",
+  "model": {
+    "entities": [
+      {
+        "id": "ent_publisher",
+        "name": "PUBLISHER"
+      },
+      {
+        "id": "ent_book",
+        "name": "BOOK"
+      },
+      {
+        "id": "ent_author",
+        "name": "AUTHOR"
+      },
+      {
+        "id": "ent_genre",
+        "name": "GENRE"
+      }
+    ],
+    "attributes": [
+      {
+        "id": "attr_publisher_name",
+        "ownerId": "ent_publisher",
+        "ownerKind": "entity",
+        "name": "name",
+        "kind": "key"
+      },
+      {
+        "id": "attr_book_isbn",
+        "ownerId": "ent_book",
+        "ownerKind": "entity",
+        "name": "isbn",
+        "kind": "key"
+      },
+      {
+        "id": "attr_book_title",
+        "ownerId": "ent_book",
+        "ownerKind": "entity",
+        "name": "title",
+        "kind": "simple"
+      },
+      {
+        "id": "attr_book_pages",
+        "ownerId": "ent_book",
+        "ownerKind": "entity",
+        "name": "pages",
+        "kind": "simple"
+      },
+      {
+        "id": "attr_book_price",
+        "ownerId": "ent_book",
+        "ownerKind": "entity",
+        "name": "price",
+        "kind": "simple"
+      },
+      {
+        "id": "attr_book_publication_date",
+        "ownerId": "ent_book",
+        "ownerKind": "entity",
+        "name": "publication_date",
+        "kind": "simple"
+      },
+      {
+        "id": "attr_book_language",
+        "ownerId": "ent_book",
+        "ownerKind": "entity",
+        "name": "language",
+        "kind": "simple"
+      },
+      {
+        "id": "attr_author_id",
+        "ownerId": "ent_author",
+        "ownerKind": "entity",
+        "name": "author_id",
+        "kind": "key"
+      },
+      {
+        "id": "attr_author_name",
+        "ownerId": "ent_author",
+        "ownerKind": "entity",
+        "name": "name",
+        "kind": "simple"
+      },
+      {
+        "id": "attr_genre_type",
+        "ownerId": "ent_genre",
+        "ownerKind": "entity",
+        "name": "type",
+        "kind": "key"
+      },
+      {
+        "id": "attr_genre_age_rating",
+        "ownerId": "ent_genre",
+        "ownerKind": "entity",
+        "name": "age_rating",
+        "kind": "simple"
+      }
+    ],
+    "relationships": [
+      {
+        "id": "rel_published_by",
+        "name": "published_by",
+        "ends": [
+          {
+            "entityId": "ent_publisher",
+            "cardinality": "1"
+          },
+          {
+            "entityId": "ent_book",
+            "cardinality": "N"
+          }
+        ]
+      },
+      {
+        "id": "rel_writes",
+        "name": "writes",
+        "ends": [
+          {
+            "entityId": "ent_author",
+            "cardinality": "M"
+          },
+          {
+            "entityId": "ent_book",
+            "cardinality": "N"
+          }
+        ]
+      },
+      {
+        "id": "rel_belongs_to",
+        "name": "belongs_to",
+        "ends": [
+          {
+            "entityId": "ent_genre",
+            "cardinality": "1"
+          },
+          {
+            "entityId": "ent_book",
+            "cardinality": "N"
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "positions": {
+      "ent_publisher": {
+        "x": 200,
+        "y": 400
+      },
+      "ent_book": {
+        "x": 600,
+        "y": 400
+      },
+      "ent_author": {
+        "x": 600,
+        "y": 100
+      },
+      "ent_genre": {
+        "x": 1000,
+        "y": 400
+      },
+      "rel_published_by": {
+        "x": 400,
+        "y": 400
+      },
+      "rel_writes": {
+        "x": 600,
+        "y": 250
+      },
+      "rel_belongs_to": {
+        "x": 800,
+        "y": 400
+      },
+      "attr_publisher_name": {
+        "x": -180,
+        "y": -100
+      },
+      "attr_book_isbn": {
+        "x": -280,
+        "y": 140
+      },
+      "attr_book_title": {
+        "x": -170,
+        "y": 200
+      },
+      "attr_book_pages": {
+        "x": -60,
+        "y": 240
+      },
+      "attr_book_price": {
+        "x": 60,
+        "y": 240
+      },
+      "attr_book_publication_date": {
+        "x": 170,
+        "y": 200
+      },
+      "attr_book_language": {
+        "x": 280,
+        "y": 140
+      },
+      "attr_author_id": {
+        "x": -170,
+        "y": -110
+      },
+      "attr_author_name": {
+        "x": 170,
+        "y": -110
+      },
+      "attr_genre_type": {
+        "x": 180,
+        "y": -100
+      },
+      "attr_genre_age_rating": {
+        "x": 180,
+        "y": 100
+      }
+    }
+  },
+  "dismissedHints": []
+}

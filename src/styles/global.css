@@ -1,0 +1,298 @@
+:root {
+  /* Helvetica everywhere: the same font jsPDF embeds, so the PDF matches. */
+  --chen-font: Helvetica, Arial, sans-serif;
+  --chen-ink: #1a1a1a;
+  --chen-paper: #fbfbf8;
+  --chen-shape-fill: #ffffff;
+  --chen-line: #333333;
+  --chen-accent: #2563eb;
+  --chen-accent-soft: #dbeafe;
+  --chen-danger: #b42318;
+  --chen-border: #d0d5dd;
+  --chen-shape-stroke-width: 1.5px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--chen-font);
+  color: var(--chen-ink);
+  background: var(--chen-paper);
+}
+
+.chen-app,
+.chen-canvas {
+  height: 100%;
+  width: 100%;
+}
+
+.chen-canvas.is-linking .react-flow__pane {
+  cursor: crosshair;
+}
+
+/* ---------- shapes ---------- */
+
+.chen-shape {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  padding: 2px 6px;
+  position: relative;
+  text-align: center;
+  width: 100%;
+}
+
+.chen-entity {
+  background: var(--chen-shape-fill);
+  border: var(--chen-shape-stroke-width) solid var(--chen-line);
+}
+
+.chen-attribute {
+  background: var(--chen-shape-fill);
+  border: var(--chen-shape-stroke-width) solid var(--chen-line);
+  border-radius: 50%;
+}
+
+.chen-relationship {
+  background: transparent;
+}
+
+.chen-shape-outline {
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
+.chen-shape-outline polygon {
+  fill: var(--chen-shape-fill);
+  stroke: var(--chen-line);
+  stroke-width: var(--chen-shape-stroke-width);
+  vector-effect: non-scaling-stroke;
+}
+
+.chen-shape.is-selected.chen-entity,
+.chen-shape.is-selected.chen-attribute {
+  border-color: var(--chen-accent);
+  box-shadow: 0 0 0 3px var(--chen-accent-soft);
+}
+
+.chen-shape.is-selected .chen-shape-outline polygon {
+  stroke: var(--chen-accent);
+  stroke-width: 3px;
+}
+
+.chen-label {
+  line-height: 1.2;
+  pointer-events: none;
+  position: relative;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+/* A key attribute is shown by underlining its name (SPEC.md §5). */
+.chen-label--key {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chen-inline-name {
+  background: #ffffff;
+  border: 1px solid var(--chen-accent);
+  border-radius: 2px;
+  font-family: inherit;
+  max-width: 90%;
+  padding: 1px 4px;
+  position: relative;
+  text-align: center;
+  z-index: 2;
+}
+
+/* Handles stay invisible until the shape is hovered, so the diagram reads
+   cleanly but a relationship can still be dragged out of any side. */
+.chen-handle {
+  background: var(--chen-accent);
+  border: 1px solid #ffffff;
+  height: 8px;
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+  width: 8px;
+}
+
+.chen-entity:hover .chen-handle:not(.chen-handle--anchor),
+.chen-handle:not(.chen-handle--anchor):focus-visible {
+  opacity: 1;
+}
+
+/* Purely an anchor point for edge resolution: never seen, never hit. */
+.chen-handle--anchor {
+  height: 1px;
+  min-height: 1px;
+  min-width: 1px;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+}
+
+/* ---------- edges ---------- */
+
+.chen-edge {
+  fill: none;
+  stroke: var(--chen-line);
+  stroke-width: 1.5;
+}
+
+.chen-cardinality {
+  background: var(--chen-paper);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--chen-ink);
+  cursor: pointer;
+  font-family: var(--chen-font);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  pointer-events: all;
+  position: absolute;
+}
+
+.chen-cardinality:hover {
+  border-color: var(--chen-accent);
+}
+
+/* An undecided cardinality is a dashed, clickable placeholder (SPEC.md §5). */
+.chen-cardinality--unset {
+  border: 1px dashed var(--chen-danger);
+  color: var(--chen-danger);
+  font-weight: 400;
+}
+
+/* ---------- toolbar ---------- */
+
+.chen-toolbar {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--chen-border);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgb(16 24 40 / 10%);
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+}
+
+.chen-toolbar button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--chen-ink);
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: 13px;
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.chen-toolbar button:hover:not(:disabled) {
+  background: #f2f4f7;
+}
+
+.chen-toolbar button:disabled {
+  color: #98a2b3;
+  cursor: not-allowed;
+}
+
+.chen-toolbar button[aria-pressed='true'] {
+  background: var(--chen-accent-soft);
+  border-color: var(--chen-accent);
+}
+
+.chen-toolbar-toggle {
+  align-items: center;
+  border-left: 1px solid var(--chen-border);
+  display: flex;
+  font-size: 13px;
+  gap: 6px;
+  margin-left: 4px;
+  padding-left: 10px;
+}
+
+/* Shape of the element, not just its colour, so the buttons stay readable
+   without relying on colour alone (SPEC.md §10). */
+.chen-icon {
+  border: 1.5px solid currentcolor;
+  display: inline-block;
+  height: 11px;
+  width: 14px;
+}
+
+.chen-icon--attribute {
+  border-radius: 50%;
+}
+
+.chen-icon--relationship {
+  height: 12px;
+  transform: rotate(45deg) scale(0.8);
+  width: 12px;
+}
+
+.chen-icon--delete {
+  border: none;
+  height: auto;
+  width: auto;
+}
+
+.chen-icon--delete::before {
+  content: '×';
+  font-size: 16px;
+  line-height: 11px;
+}
+
+/* ---------- focus & notices ---------- */
+
+.chen-toolbar button:focus-visible,
+.chen-cardinality:focus-visible,
+.chen-notice button:focus-visible,
+.chen-toolbar input:focus-visible {
+  outline: 2px solid var(--chen-accent);
+  outline-offset: 2px;
+}
+
+.chen-notice {
+  align-items: center;
+  background: #1a1a1a;
+  border-radius: 8px;
+  bottom: 24px;
+  color: #ffffff;
+  display: flex;
+  font-size: 13px;
+  gap: 12px;
+  left: 50%;
+  padding: 10px 14px;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.chen-notice button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
