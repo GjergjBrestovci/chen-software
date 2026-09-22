@@ -225,6 +225,32 @@ describe('buildScene edges', () => {
     expect(second?.data?.label?.endIndex).toBe(1);
   });
 
+  it('declares a size and a handle on every node, so no edge is ever hidden', () => {
+    // React Flow hides an edge whose endpoints it considers unmeasured, and it
+    // discards its measurements whenever a node arrives as a new object, which
+    // this scene does on every drag frame. Without these, dragging an attribute
+    // or a relationship made every line in the diagram vanish.
+    for (const node of scene(bookstore()).nodes) {
+      expect(node.measured).toEqual({ width: node.width, height: node.height });
+      expect(node.handles).toHaveLength(1);
+      expect(node.handles?.[0]?.id).toBe(ANCHOR_HANDLE_ID);
+    }
+  });
+
+  it('gives each node its own handle objects, which React Flow mutates', () => {
+    const { nodes } = scene(bookstore());
+    const handles = nodes.flatMap((node) => node.handles ?? []);
+    expect(new Set(handles).size).toBe(handles.length);
+  });
+
+  it('keeps sizes and declared measurements in step while dragging', () => {
+    const dragged = scene(sample(), { dragPositions: { book: { x: 900, y: 900 } } });
+    for (const node of dragged.nodes) {
+      expect(node.measured?.width).toBe(node.width);
+      expect(node.measured?.height).toBe(node.height);
+    }
+  });
+
   it('names the anchor handle on both ends of every edge', () => {
     // React Flow silently drops an edge whose handle it cannot resolve, which
     // makes the whole diagram render as shapes with no lines between them.

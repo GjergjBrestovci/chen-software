@@ -220,6 +220,24 @@ describe('Canvas interactions', () => {
     });
   });
 
+  it('draws the line between an attribute and its owner', async () => {
+    const user = userEvent.setup();
+    const { container } = renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+    select([model().entities[0]?.id ?? '']);
+    await user.keyboard('a');
+    await user.keyboard('isbn{Enter}');
+
+    // React Flow hides edges between nodes it thinks are unmeasured. The scene
+    // declares sizes and handles precisely so that never happens, which is also
+    // what stops every line vanishing during a drag.
+    await waitFor(() => {
+      expect(container.querySelectorAll('.chen-edge')).toHaveLength(1);
+    });
+  });
+
   it('labels every toolbar button with its shortcut', () => {
     renderCanvas();
 
