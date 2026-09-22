@@ -8,7 +8,12 @@ import {
   createEmptyDocument,
 } from '../../model/operations';
 import type { ErDocument } from '../../model/types';
-import { attributeOffsetFor, findFreeOffset, placeMissingPositions } from '../placement';
+import {
+  attributeOffsetFor,
+  findFreeOffset,
+  freeSpotFor,
+  placeMissingPositions,
+} from '../placement';
 import type { AttributeSlotContext } from '../placement';
 
 const OWNER = { width: 120, height: 60 };
@@ -310,5 +315,121 @@ describe('placeMissingPositions', () => {
     expect(placeMissingPositions(stripped, ['book', 'isbn'])).toEqual(
       placeMissingPositions(stripped, ['book', 'isbn']),
     );
+  });
+});
+
+describe('freeSpotFor', () => {
+  const SIZE = shapeSizeFor('rect', '');
+
+  function overlaps(
+    a: { x: number; y: number },
+    aSize: { width: number; height: number },
+    b: { x: number; y: number },
+    bSize: { width: number; height: number },
+  ): boolean {
+    return (
+      a.x < b.x + bSize.width &&
+      a.x + aSize.width > b.x &&
+      a.y < b.y + bSize.height &&
+      a.y + aSize.height > b.y
+    );
+  }
+
+  it('uses the requested spot on an empty canvas', () => {
+    expect(freeSpotFor(createEmptyDocument(), { x: 100, y: 200 }, SIZE)).toEqual({
+      x: 100,
+      y: 200,
+    });
+  });
+
+  it('uses the requested spot when it is clear', () => {
+    const document = addEntity(createEmptyDocument(), {
+      id: 'far',
+      name: 'FAR',
+      position: { x: 2000, y: 2000 },
+    });
+    expect(freeSpotFor(document, { x: 100, y: 200 }, SIZE)).toEqual({ x: 100, y: 200 });
+  });
+
+  it('never stacks a new entity on top of an existing one', () => {
+    // The bug: pressing E twice put both entities in exactly the same place.
+    const document = addEntity(createEmptyDocument(), {
+      id: 'book',
+      name: '',
+      position: { x: 100, y: 200 },
+    });
+    const spot = freeSpotFor(document, { x: 100, y: 200 }, SIZE);
+    expect(overlaps(spot, SIZE, { x: 100, y: 200 }, SIZE)).toBe(false);
+  });
+
+  it('keeps finding room as the same spot is used again and again', () => {
+    let document = createEmptyDocument();
+    const placed: { x: number; y: number }[] = [];
+
+    for (let index = 0; index < 12; index += 1) {
+      const spot = freeSpotFor(document, { x: 0, y: 0 }, SIZE);
+      placed.push(spot);
+      document = addEntity(document, { id: `e${String(index)}`, name: '', position: spot });
+    }
+
+    for (let a = 0; a < placed.length; a += 1) {
+      for (let b = a + 1; b < placed.length; b += 1) {
+        const first = placed[a];
+        const second = placed[b];
+        if (first && second) {
+          expect(overlaps(first, SIZE, second, SIZE)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('steps right first, so a new entity lands next to the one in the way', () => {
+    const document = addEntity(createEmptyDocument(), {
+      id: 'book',
+      name: '',
+      position: { x: 0, y: 0 },
+    });
+    const spot = freeSpotFor(document, { x: 0, y: 0 }, SIZE);
+    expect(spot.y).toBe(0);
+    expect(spot.x).toBeGreaterThan(0);
+  });
+
+  it('avoids relationships as well as entities', () => {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'a', name: 'A', position: { x: -1000, y: 0 } });
+    document = addEntity(document, { id: 'b', name: 'B', position: { x: 1000, y: 0 } });
+    document = addRelationship(document, {
+      id: 'r',
+      name: '',
+      entityIds: ['a', 'b'],
+      position: { x: 0, y: 0 },
+    });
+
+    const spot = freeSpotFor(document, { x: 0, y: 0 }, SIZE);
+    expect(overlaps(spot, SIZE, { x: 0, y: 0 }, shapeSizeFor('diamond', ''))).toBe(false);
+  });
+
+  it('falls back to the requested spot when the whole search area is full', () => {
+    let document = createEmptyDocument();
+    for (let row = 0; row < 30; row += 1) {
+      for (let column = 0; column < 30; column += 1) {
+        document = addEntity(document, {
+          id: `e${String(row)}-${String(column)}`,
+          name: '',
+          position: { x: column * 60, y: row * 30 },
+        });
+      }
+    }
+    expect(freeSpotFor(document, { x: 0, y: 0 }, SIZE)).toEqual({ x: 0, y: 0 });
+  });
+
+  it('ignores an element that has no saved position', () => {
+    const document = addEntity(createEmptyDocument(), {
+      id: 'book',
+      name: '',
+      position: { x: 0, y: 0 },
+    });
+    const stripped: ErDocument = { ...document, layout: { positions: {} } };
+    expect(freeSpotFor(stripped, { x: 0, y: 0 }, SIZE)).toEqual({ x: 0, y: 0 });
   });
 });

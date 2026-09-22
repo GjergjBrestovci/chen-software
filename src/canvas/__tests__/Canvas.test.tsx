@@ -72,6 +72,24 @@ describe('Canvas interactions', () => {
     expect(await screen.findByRole('textbox')).toHaveFocus();
   });
 
+  it('puts a second entity beside the first instead of on top of it', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+    await user.keyboard('e');
+    await user.keyboard('AUTHOR{Enter}');
+
+    const [first, second] = model().entities;
+    const positions = useDocumentStore.getState().document.layout.positions;
+    const a = positions[first?.id ?? ''];
+    const b = positions[second?.id ?? ''];
+    expect(a).toBeDefined();
+    expect(b).toBeDefined();
+    expect(a).not.toEqual(b);
+  });
+
   it('names a new entity when the student presses Enter', async () => {
     const user = userEvent.setup();
     renderCanvas();
@@ -217,24 +235,6 @@ describe('Canvas interactions', () => {
       expect(
         container.querySelectorAll(`[data-handleid="${ANCHOR_HANDLE_ID}"]`).length,
       ).toBeGreaterThan(0);
-    });
-  });
-
-  it('draws the line between an attribute and its owner', async () => {
-    const user = userEvent.setup();
-    const { container } = renderCanvas();
-
-    await user.keyboard('e');
-    await user.keyboard('BOOK{Enter}');
-    select([model().entities[0]?.id ?? '']);
-    await user.keyboard('a');
-    await user.keyboard('isbn{Enter}');
-
-    // React Flow hides edges between nodes it thinks are unmeasured. The scene
-    // declares sizes and handles precisely so that never happens, which is also
-    // what stops every line vanishing during a drag.
-    await waitFor(() => {
-      expect(container.querySelectorAll('.chen-edge')).toHaveLength(1);
     });
   });
 

@@ -2,8 +2,7 @@
    React Flow constrains node and edge data to `Record<string, unknown>`. A type
    alias gets an implicit index signature and satisfies that; an interface does
    not. These must stay `type`. */
-import { Position as HandlePosition } from '@xyflow/react';
-import type { Edge, Node, NodeHandle } from '@xyflow/react';
+import type { Edge, Node } from '@xyflow/react';
 import {
   boxFromTopLeft,
   cardinalityLabelPlacement,
@@ -93,29 +92,21 @@ export interface Scene {
 const ORIGIN: Position = { x: 0, y: 0 };
 
 /**
- * React Flow hides an edge whose endpoints are not "initialized", and it treats
- * a node as uninitialized until it has measured the node's handles in the DOM.
- * Because this scene is rebuilt from the document on every drag frame, every
- * node arrives as a fresh object, React Flow discards the measurements it had,
- * and every line in the diagram disappears for the duration of the drag.
+ * Sizes declared for React Flow, which hides an edge whose endpoints it thinks
+ * are unmeasured.
  *
- * Geometry here is exact and already known, so the sizes and a handle are
- * declared rather than waiting to be measured. React Flow still measures the
- * real handles and prefers those bounds once it has them; this only covers the
- * window in between.
+ * This scene is rebuilt from the document on every drag frame, so every node
+ * arrives as a fresh object. React Flow's `parseHandles` keeps a node's
+ * measured handle bounds across such a rebuild only when the new object
+ * carries `measured`; without it the bounds are discarded and every line in the
+ * diagram disappears for the duration of the drag.
+ *
+ * Declaring `handles` as well would be a mistake: React Flow then builds the
+ * bounds from what is declared and never uses the real measurements, which
+ * breaks dragging a connection between entities.
  */
-function anchorHandles(size: Size): NodeHandle[] {
-  return [
-    {
-      id: ANCHOR_HANDLE_ID,
-      type: 'source',
-      position: HandlePosition.Top,
-      x: size.width / 2,
-      y: 0,
-      width: 1,
-      height: 1,
-    },
-  ];
+function declaredSize(size: Size): { width: number; height: number } {
+  return { width: size.width, height: size.height };
 }
 
 export function cardinalityEdgeId(relationshipId: Id, endIndex: number): string {
@@ -148,8 +139,7 @@ export function buildScene(input: SceneInput): Scene {
       position,
       width: size.width,
       height: size.height,
-      measured: { width: size.width, height: size.height },
-      handles: anchorHandles(size),
+      measured: declaredSize(size),
       selected: selected.has(entity.id),
       data: {
         label: entity.name,
@@ -169,8 +159,7 @@ export function buildScene(input: SceneInput): Scene {
       position,
       width: size.width,
       height: size.height,
-      measured: { width: size.width, height: size.height },
-      handles: anchorHandles(size),
+      measured: declaredSize(size),
       selected: selected.has(relationship.id),
       data: {
         label: relationship.name,
@@ -224,8 +213,7 @@ export function buildScene(input: SceneInput): Scene {
         position: offset,
         width: size.width,
         height: size.height,
-        measured: { width: size.width, height: size.height },
-        handles: anchorHandles(size),
+        measured: declaredSize(size),
         selected: selected.has(attribute.id),
         data: {
           label: attribute.name,

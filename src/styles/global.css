@@ -208,8 +208,11 @@ body {
   stroke-width: 1.5;
 }
 
+/* Lines are never selectable, and they meet a shape exactly where its handles
+   sit, so taking pointer events would block connecting and picking there. */
 .chen-edge {
   fill: none;
+  pointer-events: none;
   stroke: var(--chen-line);
   stroke-width: 1.5;
 }

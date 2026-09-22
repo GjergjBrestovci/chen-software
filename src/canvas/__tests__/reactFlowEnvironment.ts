@@ -2,9 +2,12 @@
  * React Flow measures the DOM, which jsdom does not implement. These stubs give
  * it a fixed 1000x800 viewport so the canvas can be rendered in a test.
  *
- * Edges still do not appear: React Flow only draws them once nodes have been
- * measured for real. Edge rendering is covered by `scene.test.ts` (the geometry
- * and labels) and `CardinalityChip.test.tsx` (the interactive label).
+ * Edges do not appear: React Flow draws one only after measuring the handles of
+ * both its nodes, and nothing is ever measured here. Edge geometry is covered
+ * by `scene.test.ts`, the interactive label by `CardinalityChip.test.tsx`, and
+ * connection decisions by `connections.test.ts`. Behaviour that needs a real
+ * browser (lines surviving a drag, connecting by dragging) is verified by hand
+ * or by driving Chrome.
  */
 class ResizeObserverStub implements ResizeObserver {
   observe(): void {

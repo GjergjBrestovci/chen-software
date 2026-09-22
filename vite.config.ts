@@ -23,6 +23,7 @@ export default defineConfig({
         'src/persistence/**/*.ts',
         'src/canvas/scene.ts',
         'src/canvas/nodeChanges.ts',
+        'src/canvas/connections.ts',
         'src/canvas/nodes/componentStyle.ts',
       ],
       // Type-only modules have no runtime statements to cover.

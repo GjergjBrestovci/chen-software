@@ -203,3 +203,57 @@ export function placeMissingPositions(document: ErDocument, missingIds: readonly
 
   return repaired;
 }
+
+/** Clear space kept around a new entity. */
+const NEW_ELEMENT_GAP = 24;
+/** Spots tried per row before moving down a row. */
+const NEW_ELEMENT_PER_ROW = 5;
+/** Rows tried before giving up and using the requested spot. */
+const NEW_ELEMENT_ROWS = 8;
+
+/**
+ * The top-left for a new entity or relationship: `desired` if that is clear,
+ * otherwise the nearest clear spot to its right, then below.
+ *
+ * Without this, pressing E twice put the second entity exactly on top of the
+ * first, so the diagram looked unchanged and the entity underneath could not
+ * be clicked. Only entities and relationships are considered occupied;
+ * attributes sit around their owner and may be passed over.
+ */
+export function freeSpotFor(document: ErDocument, desired: Position, size: Size): Position {
+  const { model, layout } = document;
+
+  const occupied = [
+    ...model.entities.map((entity) => ({ id: entity.id, size: shapeSizeFor('rect', entity.name) })),
+    ...model.relationships.map((relationship) => ({
+      id: relationship.id,
+      size: shapeSizeFor('diamond', relationship.name),
+    })),
+  ].flatMap(({ id, size: occupiedSize }) => {
+    const topLeft = layout.positions[id];
+    return topLeft ? [{ topLeft, size: occupiedSize }] : [];
+  });
+
+  const clashes = (candidate: Position): boolean =>
+    occupied.some(
+      ({ topLeft, size: other }) =>
+        candidate.x < topLeft.x + other.width + NEW_ELEMENT_GAP &&
+        candidate.x + size.width + NEW_ELEMENT_GAP > topLeft.x &&
+        candidate.y < topLeft.y + other.height + NEW_ELEMENT_GAP &&
+        candidate.y + size.height + NEW_ELEMENT_GAP > topLeft.y,
+    );
+
+  for (let row = 0; row < NEW_ELEMENT_ROWS; row += 1) {
+    for (let column = 0; column < NEW_ELEMENT_PER_ROW; column += 1) {
+      const candidate = {
+        x: desired.x + column * (size.width + NEW_ELEMENT_GAP),
+        y: desired.y + row * (size.height + NEW_ELEMENT_GAP),
+      };
+      if (!clashes(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  return desired;
+}

@@ -9,10 +9,12 @@ import {
   ReactFlow,
   useReactFlow,
 } from '@xyflow/react';
-import type { Connection, NodeChange } from '@xyflow/react';
+import type { Connection, FinalConnectionState, NodeChange } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import { containsPoint, shapeSizeFor } from '../geometry';
 import { messages } from '../i18n/messages.en';
+import { freeSpotFor } from '../layout/placement';
 import { GRID_SIZE } from '../layout/types';
 import type { Id, Position } from '../model/types';
 import { useDocumentStore } from '../store/documentStore';
@@ -25,6 +27,8 @@ import { AttributeNode } from './nodes/AttributeNode';
 import { EntityNode } from './nodes/EntityNode';
 import { RelationshipNode } from './nodes/RelationshipNode';
 import { ChenEdge } from './edges/ChenEdge';
+import { decideConnect, decideConnectEnd } from './connections';
+import type { ConnectionDecision } from './connections';
 import { readNodeChanges, toMoves } from './nodeChanges';
 import { buildScene, midpointBetween } from './scene';
 import type { AppNode } from './scene';
@@ -109,11 +113,17 @@ export function Canvas(): ReactElement {
     [scene],
   );
 
+  /**
+   * Creates an entity centred on `point`, or at the nearest clear spot if
+   * something is already there.
+   */
   const createEntityAt = useCallback(
-    (position: Position) => {
-      startRenaming(addEntityAt(position));
+    (point: Position) => {
+      const size = shapeSizeFor('rect', NEW_NAME);
+      const centred = { x: point.x - size.width / 2, y: point.y - size.height / 2 };
+      startRenaming(addEntityAt(freeSpotFor(document, centred, size)));
     },
-    [addEntityAt, startRenaming],
+    [addEntityAt, document, startRenaming],
   );
 
   const createRelationship = useCallback(
@@ -185,20 +195,86 @@ export function Canvas(): ReactElement {
     [startRenaming],
   );
 
+  const kindOf = useCallback((id: Id) => nodeById(id)?.type, [nodeById]);
+
+  const applyConnection = useCallback(
+    (decision: ConnectionDecision) => {
+      switch (decision.kind) {
+        case 'create':
+          createRelationship(decision.source, decision.target);
+          break;
+        case 'reject':
+          notify(
+            decision.reason === 'self'
+              ? messages.canvas.selfRelationshipRejected
+              : messages.canvas.relationshipNeedsEntities,
+          );
+          break;
+        case 'ignore':
+          break;
+      }
+    },
+    [createRelationship, notify],
+  );
+
   const onConnect = useCallback(
     (connection: Connection) => {
-      const { source, target } = connection;
-      if (source === target) {
-        notify(messages.canvas.selfRelationshipRejected);
-        return;
-      }
-      if (nodeById(source)?.type !== 'entity' || nodeById(target)?.type !== 'entity') {
-        notify(messages.canvas.relationshipNeedsEntities);
-        return;
-      }
-      createRelationship(source, target);
+      applyConnection(
+        decideConnect({
+          relationshipModeActive: relationshipMode.active,
+          source: connection.source,
+          target: connection.target,
+          kindOf,
+        }),
+      );
     },
-    [createRelationship, nodeById, notify],
+    [applyConnection, kindOf, relationshipMode.active],
+  );
+
+  /**
+   * The entity under a screen point, tested against the boxes this scene
+   * already computed rather than by poking at the DOM.
+   */
+  const entityAt = useCallback(
+    (clientX: number, clientY: number): Id | undefined => {
+      const point = screenToFlowPosition({ x: clientX, y: clientY });
+      for (const node of scene.nodes) {
+        if (node.type !== 'entity') {
+          continue;
+        }
+        const box = scene.boxes.get(node.id);
+        if (box && containsPoint(box, point)) {
+          return node.id;
+        }
+      }
+      return undefined;
+    },
+    [scene, screenToFlowPosition],
+  );
+
+  /**
+   * Finishes a connection that was released over an entity rather than over one
+   * of its handles.
+   *
+   * SPEC.md §5 says dragging onto another *entity* creates a relationship, but
+   * React Flow only completes a connection within `connectionRadius` of a
+   * handle, which is a few pixels at the edge of the shape. Releasing over the
+   * middle of a table did nothing at all.
+   */
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+      const point = 'changedTouches' in event ? event.changedTouches[0] : event;
+      applyConnection(
+        decideConnectEnd({
+          relationshipModeActive: relationshipMode.active,
+          handledByHandle: connectionState.isValid === true,
+          source: connectionState.fromNode?.id,
+          target: point ? entityAt(point.clientX, point.clientY) : undefined,
+          kindOf,
+        }),
+      );
+    },
+    [applyConnection, entityAt, kindOf, relationshipMode.active],
   );
 
   const onPaneDoubleClick = useCallback(
@@ -294,7 +370,12 @@ export function Canvas(): ReactElement {
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={closeContextMenu}
         onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
         connectionMode={ConnectionMode.Loose}
+        // While relationship mode is armed, clicking a table is a pick, not the
+        // start of a connection. Without this, one pair of clicks can complete
+        // React Flow's click-to-connect *and* the pick, making two relationships.
+        nodesConnectable={!relationshipMode.active}
         snapToGrid={snapToGrid}
         snapGrid={[GRID_SIZE, GRID_SIZE]}
         // Delete is handled by our own shortcut so it can be one undo entry.
