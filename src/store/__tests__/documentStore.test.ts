@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetIdGenerator, sequentialIdGenerator, setIdGenerator } from '../../model/ids';
 import { createEmptyDocument } from '../../model/operations';
 import { findAttribute, findEntity, findRelationship } from '../../model/queries';
-import { useDocumentStore } from '../documentStore';
+import { loadDocument, useDocumentStore } from '../documentStore';
 
 function reset(): void {
   useDocumentStore.setState({ document: createEmptyDocument() });
@@ -165,5 +165,156 @@ describe('documentStore undo history', () => {
 
     expect(store().document.model.entities).toHaveLength(2);
     expect(store().document.model.relationships).toHaveLength(1);
+  });
+});
+
+describe('documentStore undo and redo', () => {
+  beforeEach(() => {
+    setIdGenerator(sequentialIdGenerator('u'));
+    reset();
+  });
+
+  afterEach(() => {
+    resetIdGenerator();
+  });
+
+  const temporal = (): ReturnType<typeof useDocumentStore.temporal.getState> =>
+    useDocumentStore.temporal.getState();
+
+  it('walks back one action at a time', () => {
+    store().addEntityAt({ x: 0, y: 0 });
+    store().addEntityAt({ x: 100, y: 0 });
+    expect(store().document.model.entities).toHaveLength(2);
+
+    temporal().undo();
+    expect(store().document.model.entities).toHaveLength(1);
+    temporal().undo();
+    expect(store().document.model.entities).toHaveLength(0);
+  });
+
+  it('redoes what it undid', () => {
+    const id = store().addEntityAt({ x: 0, y: 0 });
+    store().rename(id, 'BOOK');
+
+    temporal().undo();
+    expect(findEntity(store().document.model, id)?.name).toBe('');
+    temporal().redo();
+    expect(findEntity(store().document.model, id)?.name).toBe('BOOK');
+  });
+
+  it('restores positions, because layout is part of the document', () => {
+    const id = store().addEntityAt({ x: 0, y: 0 });
+    store().moveMany([{ id, position: { x: 500, y: 500 } }]);
+
+    temporal().undo();
+
+    expect(store().document.layout.positions[id]).toEqual({ x: 0, y: 0 });
+  });
+
+  it('drops the redo branch once a new action is taken', () => {
+    store().addEntityAt({ x: 0, y: 0 });
+    store().addEntityAt({ x: 100, y: 0 });
+    temporal().undo();
+    expect(temporal().futureStates).toHaveLength(1);
+
+    store().addEntityAt({ x: 200, y: 0 });
+
+    expect(temporal().futureStates).toHaveLength(0);
+  });
+
+  it('does nothing when there is nothing to undo', () => {
+    expect(() => {
+      temporal().undo();
+    }).not.toThrow();
+    expect(store().document.model.entities).toHaveLength(0);
+  });
+
+  it('records nothing when a rename confirms the same name', () => {
+    const id = store().addEntityAt({ x: 0, y: 0 });
+    store().rename(id, 'BOOK');
+    const before = pastLength();
+
+    store().rename(id, 'BOOK');
+
+    expect(pastLength()).toBe(before);
+  });
+
+  it('ignores a rename of an element that undo has already removed', () => {
+    const id = store().addEntityAt({ x: 0, y: 0 });
+    temporal().undo();
+
+    expect(() => {
+      store().rename(id, 'BOOK');
+    }).not.toThrow();
+    expect(store().document.model.entities).toHaveLength(0);
+  });
+
+  it('records nothing for a drag that ends where it started', () => {
+    const id = store().addEntityAt({ x: 40, y: 60 });
+    const before = pastLength();
+
+    store().moveMany([{ id, position: { x: 40, y: 60 } }]);
+
+    expect(pastLength()).toBe(before);
+  });
+
+  it('records a drag that moved only one of several elements', () => {
+    const a = store().addEntityAt({ x: 0, y: 0 });
+    const b = store().addEntityAt({ x: 100, y: 0 });
+    const before = pastLength();
+
+    store().moveMany([
+      { id: a, position: { x: 0, y: 0 } },
+      { id: b, position: { x: 180, y: 0 } },
+    ]);
+
+    expect(pastLength()).toBe(before + 1);
+    expect(store().document.layout.positions[b]).toEqual({ x: 180, y: 0 });
+  });
+
+  it('records nothing when a cardinality is set to the value it already has', () => {
+    const a = store().addEntityAt({ x: 0, y: 0 });
+    const b = store().addEntityAt({ x: 400, y: 0 });
+    const id = store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    store().setCardinality(id, 0, 'N');
+    const before = pastLength();
+
+    store().setCardinality(id, 0, 'N');
+
+    expect(pastLength()).toBe(before);
+  });
+
+  it('keeps one entry per cardinality click', () => {
+    const a = store().addEntityAt({ x: 0, y: 0 });
+    const b = store().addEntityAt({ x: 400, y: 0 });
+    const id = store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    const before = pastLength();
+
+    store().cycleCardinality(id, 0);
+    store().cycleCardinality(id, 0);
+
+    expect(pastLength()).toBe(before + 2);
+  });
+});
+
+describe('loadDocument', () => {
+  beforeEach(() => {
+    setIdGenerator(sequentialIdGenerator('l'));
+    reset();
+  });
+
+  afterEach(() => {
+    resetIdGenerator();
+  });
+
+  it('opens a different diagram and ends the old timeline', () => {
+    store().addEntityAt({ x: 0, y: 0 });
+    expect(pastLength()).toBeGreaterThan(0);
+
+    loadDocument(createEmptyDocument('Imported'));
+
+    expect(store().document.title).toBe('Imported');
+    expect(pastLength()).toBe(0);
+    expect(useDocumentStore.temporal.getState().futureStates).toHaveLength(0);
   });
 });

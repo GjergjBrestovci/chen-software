@@ -21,6 +21,7 @@ export default defineConfig({
         'src/geometry/**/*.ts',
         'src/layout/**/*.ts',
         'src/canvas/scene.ts',
+        'src/canvas/nodeChanges.ts',
       ],
       // Type-only modules have no runtime statements to cover.
       exclude: ['**/index.ts', '**/types.ts', '**/*.test.ts', '**/__tests__/**'],

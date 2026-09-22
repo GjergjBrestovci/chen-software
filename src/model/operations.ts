@@ -212,6 +212,12 @@ export function moveElements(document: ErDocument, moves: readonly ElementMove[]
 
   return produce(document, (draft) => {
     for (const move of moves) {
+      const current = draft.layout.positions[move.id];
+      // Skipping unchanged positions keeps immer from producing a new document,
+      // so a drag that lands back where it started records no undo entry.
+      if (current?.x === move.position.x && current.y === move.position.y) {
+        continue;
+      }
       draft.layout.positions[move.id] = { x: move.position.x, y: move.position.y };
     }
   });

@@ -14,18 +14,20 @@ import '@xyflow/react/dist/style.css';
 
 import { messages } from '../i18n/messages.en';
 import { GRID_SIZE } from '../layout/types';
-import type { ElementMove } from '../model/operations';
 import type { Id, Position } from '../model/types';
 import { useDocumentStore } from '../store/documentStore';
 import { useUiStore } from '../store/uiStore';
+import { redo, undo, useCanRedo, useCanUndo } from '../store/useTemporal';
 import { Toolbar } from '../ui/Toolbar';
 import { AttributeNode } from './nodes/AttributeNode';
 import { EntityNode } from './nodes/EntityNode';
 import { RelationshipNode } from './nodes/RelationshipNode';
 import { ChenEdge } from './edges/ChenEdge';
+import { readNodeChanges, toMoves } from './nodeChanges';
 import { buildScene, midpointBetween } from './scene';
 import type { AppNode } from './scene';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { useUiReconciler } from './useUiReconciler';
 
 const nodeTypes = {
   entity: EntityNode,
@@ -62,6 +64,12 @@ export function Canvas(): ReactElement {
   const toggleSnapToGrid = useUiStore((state) => state.toggleSnapToGrid);
   const notify = useUiStore((state) => state.notify);
 
+  const canUndo = useCanUndo();
+  const canRedo = useCanRedo();
+
+  // Undo can delete whatever is selected or being renamed out from under us.
+  useUiReconciler(document);
+
   /**
    * Positions mid-drag. Kept out of the document on purpose: the store is only
    * written once, on drag stop, which is what makes a whole drag a single undo
@@ -96,39 +104,20 @@ export function Canvas(): ReactElement {
 
   const onNodesChange = useCallback(
     (changes: NodeChange<AppNode>[]) => {
-      const moved: Record<Id, Position> = {};
-      let selectionChanged = false;
-      const selection = new Set(selectedIds);
-
-      for (const change of changes) {
-        if (change.type === 'position' && change.position) {
-          moved[change.id] = change.position;
-        } else if (change.type === 'select') {
-          selectionChanged = true;
-          if (change.selected) {
-            selection.add(change.id);
-          } else {
-            selection.delete(change.id);
-          }
-        }
-      }
+      const { moved, selection } = readNodeChanges(changes, selectedIds);
 
       if (Object.keys(moved).length > 0) {
         setDragPositions((current) => ({ ...current, ...moved }));
       }
-      if (selectionChanged) {
-        setSelectedIds([...selection]);
+      if (selection) {
+        setSelectedIds(selection);
       }
     },
     [selectedIds, setSelectedIds],
   );
 
   const onNodeDragStop = useCallback(() => {
-    const moves: ElementMove[] = Object.entries(dragPositions).map(([id, position]) => ({
-      id,
-      position,
-    }));
-    moveMany(moves);
+    moveMany(toMoves(dragPositions));
     setDragPositions({});
   }, [dragPositions, moveMany]);
 
@@ -237,6 +226,8 @@ export function Canvas(): ReactElement {
         onAddAttribute: addAttributeToSelection,
         onToggleRelationshipMode: toggleRelationshipMode,
         onDeleteSelection: deleteSelection,
+        onUndo: undo,
+        onRedo: redo,
         onEscape,
       }),
       [
@@ -299,10 +290,14 @@ export function Canvas(): ReactElement {
             onToggleRelationshipMode={toggleRelationshipMode}
             onDeleteSelection={deleteSelection}
             onToggleSnap={toggleSnapToGrid}
+            onUndo={undo}
+            onRedo={redo}
             relationshipModeActive={relationshipMode.active}
             snapToGrid={snapToGrid}
             canAddAttribute={selectedOwner !== undefined && selectedOwner.type !== 'attribute'}
             canDelete={selectedIds.length > 0}
+            canUndo={canUndo}
+            canRedo={canRedo}
           />
         </Panel>
       </ReactFlow>

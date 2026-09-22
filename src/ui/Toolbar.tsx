@@ -12,10 +12,14 @@ export interface ToolbarProps {
   onToggleRelationshipMode: () => void;
   onDeleteSelection: () => void;
   onToggleSnap: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   relationshipModeActive: boolean;
   snapToGrid: boolean;
   canAddAttribute: boolean;
   canDelete: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 function withShortcut(label: string, key: string): string {
@@ -68,6 +72,30 @@ export function Toolbar(props: ToolbarProps): ReactElement {
       >
         <span aria-hidden="true" className="chen-icon chen-icon--delete" />
         {toolbar.deleteSelection}
+      </button>
+
+      <span className="chen-toolbar-separator" aria-hidden="true" />
+
+      <button
+        type="button"
+        onClick={props.onUndo}
+        disabled={!props.canUndo}
+        title={withShortcut(toolbar.undo, toolbar.undoShortcut)}
+        aria-label={withShortcut(toolbar.undo, toolbar.undoShortcut)}
+      >
+        <span aria-hidden="true" className="chen-icon chen-icon--undo" />
+        {toolbar.undo}
+      </button>
+
+      <button
+        type="button"
+        onClick={props.onRedo}
+        disabled={!props.canRedo}
+        title={withShortcut(toolbar.redo, toolbar.redoShortcut)}
+        aria-label={withShortcut(toolbar.redo, toolbar.redoShortcut)}
+      >
+        <span aria-hidden="true" className="chen-icon chen-icon--redo" />
+        {toolbar.redo}
       </button>
 
       <label className="chen-toolbar-toggle">

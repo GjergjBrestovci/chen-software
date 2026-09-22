@@ -4,7 +4,7 @@ import { attributeOffsetFor } from '../layout/placement';
 import { nextCardinality } from '../model/cardinality';
 import { createId } from '../model/ids';
 import * as operations from '../model/operations';
-import { findRelationship } from '../model/queries';
+import { findElementName, findRelationship } from '../model/queries';
 import type { Cardinality, EndIndex, ErDocument, Id, Position } from '../model/types';
 
 /**
@@ -71,7 +71,15 @@ export const useDocumentStore = create<DocumentStore>()(
       },
 
       rename: (id, name) => {
-        set({ document: operations.renameElement(get().document, { id, name }) });
+        const document = get().document;
+        const current = findElementName(document.model, id);
+        // Confirming a rename without changing anything must not fill the undo
+        // history. An unknown id means the element was undone away while its
+        // input still had focus; the blur that follows is not an error.
+        if (current === undefined || current === name) {
+          return;
+        }
+        set({ document: operations.renameElement(document, { id, name }) });
       },
 
       setCardinality: (relationshipId, endIndex, value) => {
@@ -118,6 +126,21 @@ export const useDocumentStore = create<DocumentStore>()(
       // Only the document is undoable. Selection, snap and rename state are not.
       partialize: (state) => ({ document: state.document }),
       limit: 200,
+      // Model operations return the *same* document when nothing changed, so
+      // reference equality is enough to keep no-op actions out of the history.
+      equality: (past, current) => past.document === current.document,
     },
   ),
 );
+
+/**
+ * Replaces the document and drops the undo history with it.
+ *
+ * Opening a different diagram is a boundary, not a step: undoing across it
+ * would splice two unrelated documents into one timeline. Used by import and
+ * "new diagram" in milestone 7.
+ */
+export function loadDocument(document: ErDocument): void {
+  useDocumentStore.getState().replaceDocument(document);
+  useDocumentStore.temporal.getState().clear();
+}

@@ -228,6 +228,145 @@ describe('Canvas interactions', () => {
     expect(screen.getByRole('button', { name: /relationship \(R\)/i })).toBeInTheDocument();
   });
 
+  it('undoes one action at a time with Ctrl+Z', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+    await user.keyboard('e');
+    await user.keyboard('AUTHOR{Enter}');
+
+    // Creating and naming are two decisions, so they are two entries
+    // (SPEC.md §5: "Renaming records on confirm").
+    await user.keyboard('{Control>}z{/Control}');
+    await waitFor(() => {
+      expect(model().entities.map((entity) => entity.name)).toEqual(['BOOK', '']);
+    });
+
+    await user.keyboard('{Control>}z{/Control}');
+    await waitFor(() => {
+      expect(model().entities.map((entity) => entity.name)).toEqual(['BOOK']);
+    });
+
+    await user.keyboard('{Control>}z{/Control}');
+    await waitFor(() => {
+      expect(model().entities.map((entity) => entity.name)).toEqual(['']);
+    });
+  });
+
+  it('redoes with Ctrl+Shift+Z and with Ctrl+Y', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+
+    await user.keyboard('{Control>}z{/Control}');
+    await waitFor(() => {
+      expect(model().entities[0]?.name).toBe('');
+    });
+
+    await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
+    await waitFor(() => {
+      expect(model().entities[0]?.name).toBe('BOOK');
+    });
+
+    await user.keyboard('{Control>}z{/Control}');
+    await waitFor(() => {
+      expect(model().entities[0]?.name).toBe('');
+    });
+
+    await user.keyboard('{Control>}y{/Control}');
+    await waitFor(() => {
+      expect(model().entities[0]?.name).toBe('BOOK');
+    });
+  });
+
+  it('undoes a rename back to the previous name, not off the element', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+    await waitFor(() => {
+      expect(model().entities[0]?.name).toBe('BOOK');
+    });
+
+    await user.keyboard('{Control>}z{/Control}');
+
+    await waitFor(() => {
+      expect(model().entities[0]?.name).toBe('');
+    });
+    expect(model().entities).toHaveLength(1);
+  });
+
+  it('leaves Ctrl+Z to the text field while a name is being typed', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK');
+    await user.keyboard('{Control>}z{/Control}');
+
+    // The entity is still there: the shortcut did not reach the diagram.
+    expect(model().entities).toHaveLength(1);
+  });
+
+  it('clears a selection that undo removed', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    // Escape leaves the entity unnamed, so its creation is the only entry and
+    // a single undo takes the selected element away.
+    await user.keyboard('e');
+    await user.keyboard('{Escape}');
+    select([model().entities[0]?.id ?? '']);
+    expect(useUiStore.getState().selectedIds).toHaveLength(1);
+
+    await user.keyboard('{Control>}z{/Control}');
+
+    await waitFor(() => {
+      expect(model().entities).toHaveLength(0);
+    });
+    expect(useUiStore.getState().selectedIds).toEqual([]);
+  });
+
+  it('undoes and redoes from the toolbar, disabling each end of the timeline', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    const undoButton = screen.getByRole('button', { name: /undo/i });
+    const redoButton = screen.getByRole('button', { name: /redo/i });
+    expect(undoButton).toBeDisabled();
+    expect(redoButton).toBeDisabled();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+    await waitFor(() => {
+      expect(undoButton).toBeEnabled();
+    });
+
+    await user.click(undoButton);
+    await waitFor(() => {
+      expect(model().entities[0]?.name).toBe('');
+    });
+
+    expect(redoButton).toBeEnabled();
+
+    await user.click(redoButton);
+    await waitFor(() => {
+      expect(model().entities[0]?.name).toBe('BOOK');
+    });
+  });
+
+  it('labels the undo and redo buttons with their shortcuts', () => {
+    renderCanvas();
+
+    expect(screen.getByRole('button', { name: /undo \(Ctrl\+Z\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /redo \(Ctrl\+Shift\+Z\)/i })).toBeInTheDocument();
+  });
+
   it('records the snap-to-grid preference outside the undo history', async () => {
     const user = userEvent.setup();
     renderCanvas();

@@ -3,14 +3,16 @@ import { useEffect } from 'react';
 /**
  * Keyboard shortcuts from SPEC.md §5.
  *
- * `Ctrl/Cmd+Z` / `Ctrl+Y` arrive in milestone 4 and `Ctrl/Cmd+S` in milestone 7;
- * they are deliberately absent rather than half-wired.
+ * `Ctrl/Cmd+S` arrives in milestone 7 and is deliberately absent rather than
+ * half-wired.
  */
 export interface ShortcutHandlers {
   onNewEntity: () => void;
   onAddAttribute: () => void;
   onToggleRelationshipMode: () => void;
   onDeleteSelection: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onEscape: () => void;
 }
 
@@ -35,7 +37,25 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
         return;
       }
 
-      if (isTypingInto(event.target) || event.ctrlKey || event.metaKey || event.altKey) {
+      // While a name is being typed, Ctrl+Z belongs to the text field: the
+      // student is undoing their typing, not their last diagram change.
+      if (isTypingInto(event.target)) {
+        return;
+      }
+
+      if (event.ctrlKey || event.metaKey) {
+        const key = event.key.toLowerCase();
+        if (key === 'z' && !event.shiftKey) {
+          event.preventDefault();
+          handlers.onUndo();
+        } else if ((key === 'z' && event.shiftKey) || key === 'y') {
+          event.preventDefault();
+          handlers.onRedo();
+        }
+        return;
+      }
+
+      if (event.altKey) {
         return;
       }
 

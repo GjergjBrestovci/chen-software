@@ -249,6 +249,32 @@ body {
   width: 12px;
 }
 
+.chen-toolbar-separator {
+  background: var(--chen-border);
+  height: 22px;
+  margin: 0 2px;
+  width: 1px;
+}
+
+.chen-icon--undo,
+.chen-icon--redo {
+  border: none;
+  height: auto;
+  width: auto;
+}
+
+.chen-icon--undo::before {
+  content: '\21B6';
+  font-size: 15px;
+  line-height: 11px;
+}
+
+.chen-icon--redo::before {
+  content: '\21B7';
+  font-size: 15px;
+  line-height: 11px;
+}
+
 .chen-icon--delete {
   border: none;
   height: auto;
