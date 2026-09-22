@@ -68,3 +68,33 @@ describe('uiStore', () => {
     expect(store().notice).toBeNull();
   });
 });
+
+describe('uiStore theme and context menu', () => {
+  beforeEach(() => {
+    useUiStore.setState({ theme: 'light', contextMenu: null });
+  });
+
+  it('toggles between light and dark', () => {
+    store().toggleTheme();
+    expect(store().theme).toBe('dark');
+    store().toggleTheme();
+    expect(store().theme).toBe('light');
+  });
+
+  it('opens the context menu on a component at a position', () => {
+    store().openContextMenu({ elementId: 'book', x: 10, y: 20 });
+    expect(store().contextMenu).toEqual({ elementId: 'book', x: 10, y: 20 });
+  });
+
+  it('closes the context menu', () => {
+    store().openContextMenu({ elementId: 'book', x: 10, y: 20 });
+    store().closeContextMenu();
+    expect(store().contextMenu).toBeNull();
+  });
+
+  it('moves the menu to whichever component was right-clicked last', () => {
+    store().openContextMenu({ elementId: 'book', x: 10, y: 20 });
+    store().openContextMenu({ elementId: 'author', x: 30, y: 40 });
+    expect(store().contextMenu?.elementId).toBe('author');
+  });
+});

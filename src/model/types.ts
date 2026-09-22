@@ -94,11 +94,14 @@ export interface Layout {
   positions: Record<Id, Position>;
 }
 
-/** Default colour per component kind. */
+/**
+ * Default colour per component kind. `null` means no colour was chosen, so the
+ * component follows the interface ink and adapts to the light/dark theme.
+ */
 export interface ComponentTheme {
-  entity: Color;
-  relationship: Color;
-  attribute: Color;
+  entity: Color | null;
+  relationship: Color | null;
+  attribute: Color | null;
 }
 
 /**

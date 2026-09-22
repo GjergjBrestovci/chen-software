@@ -15,6 +15,13 @@ export interface ShapeLabelProps {
   renaming: boolean;
   shape: ShapeKind;
   underline?: boolean;
+  /** A weak entity's partial key is underlined with a dashed rule (SPEC.md §6). */
+  dashedUnderline?: boolean;
+}
+
+function labelClassName(underline: boolean, dashed: boolean): string {
+  if (!underline) return 'chen-label';
+  return dashed ? 'chen-label chen-label--partial-key' : 'chen-label chen-label--key';
 }
 
 export function ShapeLabel({
@@ -23,6 +30,7 @@ export function ShapeLabel({
   renaming,
   shape,
   underline = false,
+  dashedUnderline = false,
 }: ShapeLabelProps): ReactElement {
   const rename = useDocumentStore((state) => state.rename);
   const stopRenaming = useUiStore((state) => state.stopRenaming);
@@ -43,7 +51,7 @@ export function ShapeLabel({
   }
 
   return (
-    <span className={underline ? 'chen-label chen-label--key' : 'chen-label'} style={{ fontSize }}>
+    <span className={labelClassName(underline, dashedUnderline)} style={{ fontSize }}>
       {label}
     </span>
   );

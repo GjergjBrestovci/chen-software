@@ -1,6 +1,7 @@
 import type { NodeProps } from '@xyflow/react';
 import type { ReactElement } from 'react';
 import { AnchorHandle } from './AnchorHandle';
+import { componentStyle } from './componentStyle';
 import { ShapeLabel } from './ShapeLabel';
 import type { AppNode } from '../scene';
 
@@ -22,6 +23,7 @@ export function RelationshipNode({
       className={
         selected ? 'chen-shape chen-relationship is-selected' : 'chen-shape chen-relationship'
       }
+      style={componentStyle(data.color)}
     >
       <AnchorHandle />
       <svg className="chen-shape-outline" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">

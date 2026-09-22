@@ -37,6 +37,16 @@ const nodeTypes = {
 
 const edgeTypes = { chen: ChenEdge };
 
+/**
+ * React Flow paints the grid with an SVG attribute, which cannot read a CSS
+ * custom property, so the two themes are spelled out here. These are the only
+ * colours in the app that live outside `styles/global.css`.
+ */
+const GRID_COLORS = {
+  light: { fine: '#e4e7ec', coarse: '#d0d5dd' },
+  dark: { fine: '#23272f', coarse: '#2c313a' },
+} as const;
+
 /** New shapes are created unnamed and go straight into rename mode (SPEC.md §5). */
 const NEW_NAME = '';
 
@@ -63,6 +73,10 @@ export function Canvas(): ReactElement {
   const cancelRelationshipMode = useUiStore((state) => state.cancelRelationshipMode);
   const toggleSnapToGrid = useUiStore((state) => state.toggleSnapToGrid);
   const notify = useUiStore((state) => state.notify);
+  const theme = useUiStore((state) => state.theme);
+  const toggleTheme = useUiStore((state) => state.toggleTheme);
+  const openContextMenu = useUiStore((state) => state.openContextMenu);
+  const closeContextMenu = useUiStore((state) => state.closeContextMenu);
 
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
@@ -147,6 +161,14 @@ export function Canvas(): ReactElement {
     [armRelationshipFrom, cancelRelationshipMode, createRelationship, notify, relationshipMode],
   );
 
+  const onNodeContextMenu = useCallback(
+    (event: ReactMouseEvent, node: AppNode) => {
+      event.preventDefault();
+      openContextMenu({ elementId: node.id, x: event.clientX, y: event.clientY });
+    },
+    [openContextMenu],
+  );
+
   const onNodeDoubleClick = useCallback(
     (event: ReactMouseEvent, node: AppNode) => {
       event.stopPropagation();
@@ -212,10 +234,11 @@ export function Canvas(): ReactElement {
   }, [remove, selectedIds, setSelectedIds, stopRenaming]);
 
   const onEscape = useCallback(() => {
+    closeContextMenu();
     if (relationshipMode.active) {
       cancelRelationshipMode();
     }
-  }, [cancelRelationshipMode, relationshipMode.active]);
+  }, [cancelRelationshipMode, closeContextMenu, relationshipMode.active]);
 
   useKeyboardShortcuts(
     useMemo(
@@ -258,6 +281,8 @@ export function Canvas(): ReactElement {
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onPaneClick={closeContextMenu}
         onConnect={onConnect}
         connectionMode={ConnectionMode.Loose}
         snapToGrid={snapToGrid}
@@ -273,11 +298,15 @@ export function Canvas(): ReactElement {
         proOptions={{ hideAttribution: true }}
         aria-label={messages.canvas.label}
       >
-        <Background variant={BackgroundVariant.Lines} gap={GRID_SIZE} color="#e4e7ec" />
+        <Background
+          variant={BackgroundVariant.Lines}
+          gap={GRID_SIZE}
+          color={GRID_COLORS[theme].fine}
+        />
         <Background
           variant={BackgroundVariant.Lines}
           gap={GRID_SIZE * 5}
-          color="#d0d5dd"
+          color={GRID_COLORS[theme].coarse}
           id="coarse"
         />
         <Controls showInteractive={false} />
@@ -290,6 +319,8 @@ export function Canvas(): ReactElement {
             onToggleRelationshipMode={toggleRelationshipMode}
             onDeleteSelection={deleteSelection}
             onToggleSnap={toggleSnapToGrid}
+            onToggleTheme={toggleTheme}
+            theme={theme}
             onUndo={undo}
             onRedo={redo}
             relationshipModeActive={relationshipMode.active}

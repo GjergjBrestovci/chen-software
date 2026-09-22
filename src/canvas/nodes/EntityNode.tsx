@@ -2,6 +2,7 @@ import { Handle, Position as HandlePosition } from '@xyflow/react';
 import type { NodeProps } from '@xyflow/react';
 import type { ReactElement } from 'react';
 import { AnchorHandle } from './AnchorHandle';
+import { componentStyle } from './componentStyle';
 import { ShapeLabel } from './ShapeLabel';
 import type { AppNode } from '../scene';
 
@@ -17,7 +18,10 @@ const SIDES = [
 
 export function EntityNode({ id, data, selected }: EntityNodeProps): ReactElement {
   return (
-    <div className={selected ? 'chen-shape chen-entity is-selected' : 'chen-shape chen-entity'}>
+    <div
+      className={selected ? 'chen-shape chen-entity is-selected' : 'chen-shape chen-entity'}
+      style={componentStyle(data.color)}
+    >
       <AnchorHandle />
       {SIDES.map((side) => (
         <Handle key={side} type="source" position={side} id={side} className="chen-handle" />

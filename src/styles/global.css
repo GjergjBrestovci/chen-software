@@ -3,13 +3,39 @@
   --chen-font: Helvetica, Arial, sans-serif;
   --chen-ink: #1a1a1a;
   --chen-paper: #fbfbf8;
+  --chen-surface: #ffffff;
   --chen-shape-fill: #ffffff;
   --chen-line: #333333;
   --chen-accent: #2563eb;
   --chen-accent-soft: #dbeafe;
   --chen-danger: #b42318;
   --chen-border: #d0d5dd;
+  --chen-muted: #667085;
+  --chen-hover: #f2f4f7;
+  --chen-grid: #e4e7ec;
+  --chen-grid-strong: #d0d5dd;
   --chen-shape-stroke-width: 1.5px;
+
+  /* A component with no colour of its own falls back to the interface ink,
+     which is what lets an uncoloured diagram follow the dark theme. */
+  --chen-component-stroke: var(--chen-line);
+  --chen-component-fill: var(--chen-shape-fill);
+}
+
+:root[data-theme='dark'] {
+  --chen-ink: #e6e8ea;
+  --chen-paper: #16181c;
+  --chen-surface: #202329;
+  --chen-shape-fill: #1c1f24;
+  --chen-line: #c4c9d0;
+  --chen-accent: #60a5fa;
+  --chen-accent-soft: #1e3a5f;
+  --chen-danger: #f97066;
+  --chen-border: #343841;
+  --chen-muted: #98a2b3;
+  --chen-hover: #2a2e36;
+  --chen-grid: #232730;
+  --chen-grid-strong: #2e333d;
 }
 
 * {
@@ -53,13 +79,13 @@ body {
 }
 
 .chen-entity {
-  background: var(--chen-shape-fill);
-  border: var(--chen-shape-stroke-width) solid var(--chen-line);
+  background: var(--chen-component-fill);
+  border: var(--chen-shape-stroke-width) solid var(--chen-component-stroke);
 }
 
 .chen-attribute {
-  background: var(--chen-shape-fill);
-  border: var(--chen-shape-stroke-width) solid var(--chen-line);
+  background: var(--chen-component-fill);
+  border: var(--chen-shape-stroke-width) solid var(--chen-component-stroke);
   border-radius: 50%;
 }
 
@@ -76,8 +102,8 @@ body {
 }
 
 .chen-shape-outline polygon {
-  fill: var(--chen-shape-fill);
-  stroke: var(--chen-line);
+  fill: var(--chen-component-fill);
+  stroke: var(--chen-component-stroke);
   stroke-width: var(--chen-shape-stroke-width);
   vector-effect: non-scaling-stroke;
 }
@@ -94,6 +120,7 @@ body {
 }
 
 .chen-label {
+  color: var(--chen-ink);
   line-height: 1.2;
   pointer-events: none;
   position: relative;
@@ -107,8 +134,16 @@ body {
   text-underline-offset: 2px;
 }
 
+/* A weak entity's partial key (SPEC.md §6). */
+.chen-label--partial-key {
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 2px;
+}
+
 .chen-inline-name {
-  background: #ffffff;
+  background: var(--chen-surface);
+  color: var(--chen-ink);
   border: 1px solid var(--chen-accent);
   border-radius: 2px;
   font-family: inherit;
@@ -147,6 +182,32 @@ body {
 
 /* ---------- edges ---------- */
 
+/* Markers above an attribute: not Chen notation, suppressible on export. */
+.chen-marker {
+  color: var(--chen-component-stroke);
+  pointer-events: none;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.chen-marker svg {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.chen-marker-fill {
+  fill: currentcolor;
+}
+
+.chen-marker-stroke {
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-width: 1.5;
+}
+
 .chen-edge {
   fill: none;
   stroke: var(--chen-line);
@@ -183,7 +244,7 @@ body {
 
 .chen-toolbar {
   align-items: center;
-  background: #ffffff;
+  background: var(--chen-surface);
   border: 1px solid var(--chen-border);
   border-radius: 8px;
   box-shadow: 0 1px 3px rgb(16 24 40 / 10%);
@@ -194,7 +255,7 @@ body {
 
 .chen-toolbar button {
   align-items: center;
-  background: #ffffff;
+  background: var(--chen-surface);
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--chen-ink);
@@ -207,11 +268,11 @@ body {
 }
 
 .chen-toolbar button:hover:not(:disabled) {
-  background: #f2f4f7;
+  background: var(--chen-hover);
 }
 
 .chen-toolbar button:disabled {
-  color: #98a2b3;
+  color: var(--chen-muted);
   cursor: not-allowed;
 }
 
@@ -275,6 +336,18 @@ body {
   line-height: 11px;
 }
 
+.chen-icon--theme {
+  border: none;
+  height: auto;
+  width: auto;
+}
+
+.chen-icon--theme::before {
+  content: '\25D1';
+  font-size: 14px;
+  line-height: 11px;
+}
+
 .chen-icon--delete {
   border: none;
   height: auto;
@@ -321,4 +394,110 @@ body {
   font-size: 16px;
   line-height: 1;
   padding: 0;
+}
+
+/* ---------- context menu ---------- */
+
+.chen-context-menu {
+  background: var(--chen-surface);
+  border: 1px solid var(--chen-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 18%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 280px;
+  padding: 6px;
+  position: fixed;
+  z-index: 20;
+}
+
+.chen-menu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+}
+
+.chen-menu-group + .chen-menu-group {
+  border-top: 1px solid var(--chen-border);
+  padding-top: 6px;
+}
+
+.chen-menu-group-label {
+  color: var(--chen-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 0 6px;
+  text-transform: uppercase;
+}
+
+.chen-menu-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.chen-menu-item {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--chen-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 5px 9px;
+  text-align: left;
+}
+
+.chen-menu-item:hover {
+  background: var(--chen-hover);
+}
+
+.chen-menu-item[aria-checked='true'] {
+  background: var(--chen-accent-soft);
+  border-color: var(--chen-accent);
+}
+
+.chen-menu-item--danger {
+  color: var(--chen-danger);
+}
+
+.chen-swatch {
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  height: 22px;
+  padding: 0;
+  width: 22px;
+}
+
+.chen-swatch[aria-checked='true'] {
+  border-color: var(--chen-ink);
+}
+
+/* "No colour of its own": shown as the interface ink itself. */
+.chen-swatch--theme {
+  background: var(--chen-shape-fill);
+  box-shadow: inset 0 0 0 2px var(--chen-line);
+}
+
+.chen-context-menu button:focus-visible {
+  outline: 2px solid var(--chen-accent);
+  outline-offset: 1px;
+}
+
+/* React Flow's own chrome has to follow the theme too. */
+.react-flow__controls-button {
+  background: var(--chen-surface);
+  border-bottom: 1px solid var(--chen-border);
+  fill: var(--chen-ink);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--chen-hover);
+}
+
+.react-flow__controls {
+  box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
 }

@@ -12,9 +12,11 @@ import {
 } from '../geometry';
 import type { EdgeSegment, Point, ShapeBox } from '../geometry';
 import { ANCHOR_HANDLE_ID } from './nodes/AnchorHandle';
+import { colorFor } from '../model/presentation';
 import type {
   Attribute,
   Cardinality,
+  Color,
   ErDocument,
   Id,
   Position,
@@ -33,9 +35,24 @@ import type {
  * will use, so the export cannot drift from what the student sees.
  */
 
-export type EntityNodeData = { label: string; renaming: boolean };
-export type RelationshipNodeData = { label: string; renaming: boolean };
-export type AttributeNodeData = { label: string; renaming: boolean; isKey: boolean };
+/** Colour a component is drawn in, or `null` to follow the interface ink. */
+export type ComponentColor = Color | null;
+
+export type EntityNodeData = { label: string; renaming: boolean; color: ComponentColor };
+export type RelationshipNodeData = { label: string; renaming: boolean; color: ComponentColor };
+export type AttributeNodeData = {
+  label: string;
+  renaming: boolean;
+  color: ComponentColor;
+  /** Solid underline: a key. */
+  isKey: boolean;
+  /** Dashed underline: a weak entity's partial key. */
+  isPartialKey: boolean;
+  /** Crown marker: a primary key. */
+  isPrimaryKey: boolean;
+  /** Cable marker: a foreign key (relational, not ER). */
+  isForeignKey: boolean;
+};
 
 export type AppNode =
   | Node<EntityNodeData, 'entity'>
@@ -84,7 +101,7 @@ export function attributeEdgeId(attributeId: Id): string {
 
 export function buildScene(input: SceneInput): Scene {
   const { document, renamingId } = input;
-  const { model, layout } = document;
+  const { model, layout, presentation } = document;
   const selected = new Set(input.selectedIds);
   const drag = input.dragPositions ?? {};
 
@@ -105,7 +122,11 @@ export function buildScene(input: SceneInput): Scene {
       width: size.width,
       height: size.height,
       selected: selected.has(entity.id),
-      data: { label: entity.name, renaming: renamingId === entity.id },
+      data: {
+        label: entity.name,
+        renaming: renamingId === entity.id,
+        color: colorFor(presentation, entity.id, 'entity'),
+      },
     });
     boxes.set(entity.id, boxFromTopLeft('rect', position, size));
   }
@@ -120,7 +141,11 @@ export function buildScene(input: SceneInput): Scene {
       width: size.width,
       height: size.height,
       selected: selected.has(relationship.id),
-      data: { label: relationship.name, renaming: renamingId === relationship.id },
+      data: {
+        label: relationship.name,
+        renaming: renamingId === relationship.id,
+        color: colorFor(presentation, relationship.id, 'relationship'),
+      },
     });
     const box = boxFromTopLeft('diamond', position, size);
     boxes.set(relationship.id, box);
@@ -172,7 +197,11 @@ export function buildScene(input: SceneInput): Scene {
         data: {
           label: attribute.name,
           renaming: renamingId === attribute.id,
+          color: colorFor(presentation, attribute.id, 'attribute'),
           isKey: attribute.identifier !== 'none',
+          isPartialKey: attribute.identifier === 'partial',
+          isPrimaryKey: attribute.identifier === 'key',
+          isForeignKey: attribute.foreignKey,
         },
       });
 

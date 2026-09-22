@@ -11,6 +11,15 @@ import type { Id } from '../model/types';
  * belongs in an `.erd.json` file, and none of it should land in the undo
  * history (SPEC.md §5 wants one entry per *model* change, not per click).
  */
+export type Theme = 'light' | 'dark';
+
+/** Which component the context menu is open on, and where it was opened. */
+export interface ContextMenuState {
+  elementId: Id;
+  x: number;
+  y: number;
+}
+
 export interface RelationshipMode {
   active: boolean;
   /** First entity picked, waiting for the second. */
@@ -22,6 +31,8 @@ export interface UiStore {
   renamingId: Id | null;
   relationshipMode: RelationshipMode;
   snapToGrid: boolean;
+  theme: Theme;
+  contextMenu: ContextMenuState | null;
   /** Transient message shown to the student, e.g. why an action did nothing. */
   notice: string | null;
 
@@ -32,11 +43,26 @@ export interface UiStore {
   armRelationshipFrom: (entityId: Id) => void;
   cancelRelationshipMode: () => void;
   toggleSnapToGrid: () => void;
+  toggleTheme: () => void;
+  openContextMenu: (menu: ContextMenuState) => void;
+  closeContextMenu: () => void;
   notify: (message: string) => void;
   dismissNotice: () => void;
 }
 
 const IDLE: RelationshipMode = { active: false, firstEntityId: null };
+
+/**
+ * First run follows the operating system; after that the student's choice wins.
+ * Guarded by `typeof` because the store is also constructed in node tests,
+ * where `matchMedia` does not exist.
+ */
+function preferredTheme(): Theme {
+  if (typeof globalThis.matchMedia !== 'function') {
+    return 'light';
+  }
+  return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 
 /**
  * Web storage is absent in tests and unavailable in a locked-down browser, so
@@ -67,6 +93,8 @@ export const useUiStore = create<UiStore>()(
       renamingId: null,
       relationshipMode: IDLE,
       snapToGrid: true,
+      theme: preferredTheme(),
+      contextMenu: null,
       notice: null,
 
       setSelectedIds: (ids) => {
@@ -94,6 +122,15 @@ export const useUiStore = create<UiStore>()(
       toggleSnapToGrid: () => {
         set((state) => ({ snapToGrid: !state.snapToGrid }));
       },
+      toggleTheme: () => {
+        set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' }));
+      },
+      openContextMenu: (menu) => {
+        set({ contextMenu: menu });
+      },
+      closeContextMenu: () => {
+        set({ contextMenu: null });
+      },
       notify: (message) => {
         set({ notice: message });
       },
@@ -104,8 +141,10 @@ export const useUiStore = create<UiStore>()(
     {
       name: 'chenlab-ui',
       storage: safeStorage,
-      // Only the preference survives a reload; everything else is per-session.
-      partialize: (state) => ({ snapToGrid: state.snapToGrid }),
+      // Only preferences survive a reload; everything else is per-session.
+      // The theme is a per-viewer preference, never part of the document, so a
+      // shared diagram renders correctly for whoever opens it (SPEC.md §4).
+      partialize: (state) => ({ snapToGrid: state.snapToGrid, theme: state.theme }),
     },
   ),
 );

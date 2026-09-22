@@ -56,6 +56,38 @@ export const messages = {
     attributeNeedsOwner: 'Select one entity or relationship first, then press A.',
   },
 
+  menu: {
+    label: 'Component options',
+    rename: 'Rename',
+    delete: 'Delete',
+    colour: 'Colour',
+    useThemeColour: 'Theme colour',
+    swatch: (index: number): string => `Colour ${String(index)}`,
+    entityKind: 'Entity',
+    regular: 'Regular',
+    weak: 'Weak',
+    relationshipKind: 'Relationship',
+    identifying: 'Identifying',
+    attributeShape: 'Shape',
+    simple: 'Simple',
+    composite: 'Composite',
+    multivalued: 'Multivalued',
+    derived: 'Derived',
+    attributeKey: 'Key',
+    noKey: 'None',
+    primaryKey: 'Primary key',
+    partialKey: 'Partial key',
+    relational: 'Relational',
+    foreignKey: 'Foreign key',
+    keysAreEntityOnly: 'Only an entity attribute can be a key.',
+    compositeHasParts: 'Delete its parts before changing the shape.',
+  },
+
+  marker: {
+    primaryKey: 'Primary key',
+    foreignKey: 'Foreign key',
+  },
+
   toolbar: {
     addEntity: 'New entity',
     addEntityShortcut: 'E',
@@ -70,6 +102,9 @@ export const messages = {
     redo: 'Redo',
     redoShortcut: 'Ctrl+Shift+Z',
     snapToGrid: 'Snap to grid',
+    darkTheme: 'Switch between light and dark',
+    darkMode: 'Dark',
+    lightMode: 'Light',
     shortcutSuffix: (key: string): string => ` (${key})`,
   },
 

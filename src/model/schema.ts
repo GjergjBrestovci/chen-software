@@ -71,9 +71,9 @@ const layoutSchema = z.strictObject({
 
 const presentationSchema = z.strictObject({
   theme: z.strictObject({
-    entity: colorSchema,
-    relationship: colorSchema,
-    attribute: colorSchema,
+    entity: colorSchema.nullable(),
+    relationship: colorSchema.nullable(),
+    attribute: colorSchema.nullable(),
   }),
   colors: z.record(z.string(), colorSchema),
 });

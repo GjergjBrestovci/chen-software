@@ -5,7 +5,18 @@ import { nextCardinality } from '../model/cardinality';
 import { createId } from '../model/ids';
 import * as operations from '../model/operations';
 import { findElementName, findRelationship } from '../model/queries';
-import type { Cardinality, ErDocument, Id, Position } from '../model/types';
+import type {
+  AttributeIdentifier,
+  AttributeShape,
+  Cardinality,
+  Color,
+  ComponentTheme,
+  EntityKind,
+  ErDocument,
+  Id,
+  Position,
+  RelationshipKind,
+} from '../model/types';
 
 /**
  * The document is the single source of truth. React Flow's nodes and edges are
@@ -27,6 +38,13 @@ export interface DocumentStore {
   rename: (id: Id, name: string) => void;
   setCardinality: (relationshipId: Id, endIndex: number, value: Cardinality | null) => void;
   cycleCardinality: (relationshipId: Id, endIndex: number) => void;
+  setEntityKind: (id: Id, kind: EntityKind) => void;
+  setRelationshipKind: (id: Id, kind: RelationshipKind) => void;
+  setAttributeShape: (id: Id, shape: AttributeShape) => void;
+  setAttributeIdentifier: (id: Id, identifier: AttributeIdentifier) => void;
+  setAttributeForeignKey: (id: Id, foreignKey: boolean) => void;
+  setElementColor: (id: Id, color: Color | null) => void;
+  setComponentTheme: (theme: ComponentTheme) => void;
   moveMany: (moves: readonly operations.ElementMove[]) => void;
   remove: (ids: readonly Id[]) => void;
   replaceDocument: (document: ErDocument) => void;
@@ -105,6 +123,34 @@ export const useDocumentStore = create<DocumentStore>()(
             cardinality: nextCardinality(end.cardinality),
           }),
         });
+      },
+
+      setEntityKind: (id, kind) => {
+        set({ document: operations.setEntityKind(get().document, id, kind) });
+      },
+
+      setRelationshipKind: (id, kind) => {
+        set({ document: operations.setRelationshipKind(get().document, id, kind) });
+      },
+
+      setAttributeShape: (id, shape) => {
+        set({ document: operations.setAttributeShape(get().document, id, shape) });
+      },
+
+      setAttributeIdentifier: (id, identifier) => {
+        set({ document: operations.setAttributeIdentifier(get().document, id, identifier) });
+      },
+
+      setAttributeForeignKey: (id, foreignKey) => {
+        set({ document: operations.setAttributeForeignKey(get().document, id, foreignKey) });
+      },
+
+      setElementColor: (id, color) => {
+        set({ document: operations.setElementColor(get().document, id, color) });
+      },
+
+      setComponentTheme: (theme) => {
+        set({ document: operations.setTheme(get().document, theme) });
       },
 
       moveMany: (moves) => {

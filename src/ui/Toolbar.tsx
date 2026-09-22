@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { messages } from '../i18n/messages.en';
+import type { Theme } from '../store/uiStore';
 
 /**
  * Every button carries a label and a tooltip naming its shortcut, and the
@@ -12,6 +13,8 @@ export interface ToolbarProps {
   onToggleRelationshipMode: () => void;
   onDeleteSelection: () => void;
   onToggleSnap: () => void;
+  onToggleTheme: () => void;
+  theme: Theme;
   onUndo: () => void;
   onRedo: () => void;
   relationshipModeActive: boolean;
@@ -102,6 +105,17 @@ export function Toolbar(props: ToolbarProps): ReactElement {
         <input type="checkbox" checked={props.snapToGrid} onChange={props.onToggleSnap} />
         {toolbar.snapToGrid}
       </label>
+
+      <button
+        type="button"
+        onClick={props.onToggleTheme}
+        aria-pressed={props.theme === 'dark'}
+        title={toolbar.darkTheme}
+        aria-label={toolbar.darkTheme}
+      >
+        <span aria-hidden="true" className="chen-icon chen-icon--theme" />
+        {props.theme === 'dark' ? toolbar.lightMode : toolbar.darkMode}
+      </button>
     </div>
   );
 }

@@ -263,9 +263,9 @@
   },
   "presentation": {
     "theme": {
-      "entity": "#333333",
-      "relationship": "#333333",
-      "attribute": "#333333"
+      "entity": null,
+      "relationship": null,
+      "attribute": null
     },
     "colors": {}
   },
