@@ -3,13 +3,18 @@
    alias gets an implicit index signature and satisfies that; an interface does
    not. These must stay `type`. */
 import type { Edge, Node } from '@xyflow/react';
-import { boxFromTopLeft, cardinalityLabelPlacement, floatingEdge, shapeSizeFor } from '../geometry';
+import {
+  boxFromTopLeft,
+  cardinalityLabelPlacement,
+  floatingEdge,
+  shapeSizeFor,
+  topLeftOf,
+} from '../geometry';
 import type { EdgeSegment, Point, ShapeBox } from '../geometry';
 import { ANCHOR_HANDLE_ID } from './nodes/AnchorHandle';
 import type {
   Attribute,
   Cardinality,
-  EndIndex,
   ErDocument,
   Id,
   Position,
@@ -39,7 +44,7 @@ export type AppNode =
 
 export type CardinalityLabel = {
   relationshipId: Id;
-  endIndex: EndIndex;
+  endIndex: number;
   value: Cardinality | null;
   position: Point;
 };
@@ -69,7 +74,7 @@ export interface Scene {
 
 const ORIGIN: Position = { x: 0, y: 0 };
 
-export function cardinalityEdgeId(relationshipId: Id, endIndex: EndIndex): string {
+export function cardinalityEdgeId(relationshipId: Id, endIndex: number): string {
   return `card:${relationshipId}:${String(endIndex)}`;
 }
 
@@ -87,7 +92,7 @@ export function buildScene(input: SceneInput): Scene {
 
   const nodes: AppNode[] = [];
   const boxes = new Map<Id, ShapeBox>();
-  const placedAttributes: { attribute: Attribute; box: ShapeBox }[] = [];
+  const placedAttributes: { attribute: Attribute; box: ShapeBox; ownerBox: ShapeBox }[] = [];
   const placedRelationships: { relationship: Relationship; box: ShapeBox }[] = [];
 
   for (const entity of model.entities) {
@@ -122,47 +127,67 @@ export function buildScene(input: SceneInput): Scene {
     placedRelationships.push({ relationship, box });
   }
 
-  // Attributes come last: React Flow needs a parent node before its children.
-  for (const attribute of model.attributes) {
-    const size = shapeSizeFor('ellipse', attribute.name);
-    const offset = positionOf(attribute.id);
-    const ownerPosition = positionOf(attribute.ownerId);
+  /**
+   * Attributes are placed owner-before-part, in waves.
+   *
+   * Two reasons, both load-bearing. React Flow needs a parent node to appear
+   * before its children, and model order does not guarantee that. And a part of
+   * a composite stores its offset relative to that composite, which is itself
+   * relative to an entity, so the absolute position has to accumulate down the
+   * chain rather than adding one stored offset to another.
+   *
+   * Anything still unplaced when a wave adds nothing has a missing or cyclic
+   * owner. The schema rejects such a file, so this only guards a model damaged
+   * in memory; those attributes are skipped rather than drawn in the wrong place.
+   */
+  let unplaced = [...model.attributes];
 
-    nodes.push({
-      id: attribute.id,
-      type: 'attribute',
-      // Relative to the owner, which is exactly what React Flow wants from a
-      // child node, so dragging the owner moves it for free (SPEC.md §5).
-      parentId: attribute.ownerId,
-      position: offset,
-      width: size.width,
-      height: size.height,
-      selected: selected.has(attribute.id),
-      data: {
-        label: attribute.name,
-        renaming: renamingId === attribute.id,
-        isKey: attribute.kind === 'key',
-      },
+  for (;;) {
+    // Pairing each attribute with its owner's box here means the edge loop
+    // below never has to ask whether the owner exists.
+    const ready = unplaced.flatMap((attribute) => {
+      const ownerBox = boxes.get(attribute.ownerId);
+      return ownerBox ? [{ attribute, ownerBox }] : [];
     });
+    if (ready.length === 0) {
+      break;
+    }
 
-    const box = boxFromTopLeft(
-      'ellipse',
-      { x: ownerPosition.x + offset.x, y: ownerPosition.y + offset.y },
-      size,
-    );
-    boxes.set(attribute.id, box);
-    placedAttributes.push({ attribute, box });
+    for (const { attribute, ownerBox } of ready) {
+      const ownerTopLeft = topLeftOf(ownerBox);
+      const size = shapeSizeFor('ellipse', attribute.name);
+      const offset = positionOf(attribute.id);
+      const topLeft = { x: ownerTopLeft.x + offset.x, y: ownerTopLeft.y + offset.y };
+
+      nodes.push({
+        id: attribute.id,
+        type: 'attribute',
+        // Relative to the owner, which is exactly what React Flow wants from a
+        // child node, so dragging the owner moves it for free (SPEC.md §5).
+        parentId: attribute.ownerId,
+        position: offset,
+        width: size.width,
+        height: size.height,
+        selected: selected.has(attribute.id),
+        data: {
+          label: attribute.name,
+          renaming: renamingId === attribute.id,
+          isKey: attribute.identifier !== 'none',
+        },
+      });
+
+      const box = boxFromTopLeft('ellipse', topLeft, size);
+      boxes.set(attribute.id, box);
+      placedAttributes.push({ attribute, box, ownerBox });
+    }
+
+    const justPlaced = new Set(ready.map(({ attribute }) => attribute.id));
+    unplaced = unplaced.filter((attribute) => !justPlaced.has(attribute.id));
   }
 
   const edges: AppEdge[] = [];
 
-  for (const { attribute, box } of placedAttributes) {
-    const owner = boxes.get(attribute.ownerId);
-    if (!owner) {
-      // Only reachable for a model damaged in memory; the schema rejects such
-      // a file outright. Drawing nothing beats drawing a line to nowhere.
-      continue;
-    }
+  for (const { attribute, box, ownerBox } of placedAttributes) {
     edges.push({
       id: attributeEdgeId(attribute.id),
       type: 'chen',
@@ -171,7 +196,7 @@ export function buildScene(input: SceneInput): Scene {
       sourceHandle: ANCHOR_HANDLE_ID,
       targetHandle: ANCHOR_HANDLE_ID,
       selectable: false,
-      data: { segment: floatingEdge(box, owner), label: null },
+      data: { segment: floatingEdge(box, ownerBox), label: null },
     });
   }
 
@@ -181,11 +206,10 @@ export function buildScene(input: SceneInput): Scene {
       if (!entity) {
         return;
       }
-      const endIndex = index as EndIndex;
       const placement = cardinalityLabelPlacement(entity, diamond);
 
       edges.push({
-        id: cardinalityEdgeId(relationship.id, endIndex),
+        id: cardinalityEdgeId(relationship.id, index),
         type: 'chen',
         source: end.entityId,
         target: relationship.id,
@@ -197,7 +221,7 @@ export function buildScene(input: SceneInput): Scene {
           // The label belongs to the entity this end counts (SPEC.md §5).
           label: {
             relationshipId: relationship.id,
-            endIndex,
+            endIndex: index,
             value: end.cardinality,
             position: placement.position,
           },

@@ -20,6 +20,7 @@ export default defineConfig({
         'src/model/**/*.ts',
         'src/geometry/**/*.ts',
         'src/layout/**/*.ts',
+        'src/persistence/**/*.ts',
         'src/canvas/scene.ts',
         'src/canvas/nodeChanges.ts',
       ],

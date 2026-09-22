@@ -1,0 +1,366 @@
+{
+  "version": 2,
+  "title": "University",
+  "model": {
+    "entities": [
+      {
+        "id": "ent_department",
+        "name": "DEPARTMENT",
+        "kind": "regular"
+      },
+      {
+        "id": "ent_course",
+        "name": "COURSE",
+        "kind": "weak"
+      },
+      {
+        "id": "ent_student",
+        "name": "STUDENT",
+        "kind": "regular"
+      },
+      {
+        "id": "ent_semester",
+        "name": "SEMESTER",
+        "kind": "regular"
+      },
+      {
+        "id": "ent_employee",
+        "name": "EMPLOYEE",
+        "kind": "regular"
+      }
+    ],
+    "attributes": [
+      {
+        "id": "at_dept_id",
+        "ownerId": "ent_department",
+        "ownerKind": "entity",
+        "name": "dept_id",
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false
+      },
+      {
+        "id": "at_dept_name",
+        "ownerId": "ent_department",
+        "ownerKind": "entity",
+        "name": "name",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
+      },
+      {
+        "id": "at_course_code",
+        "ownerId": "ent_course",
+        "ownerKind": "entity",
+        "name": "code",
+        "shape": "simple",
+        "identifier": "partial",
+        "foreignKey": false
+      },
+      {
+        "id": "at_course_title",
+        "ownerId": "ent_course",
+        "ownerKind": "entity",
+        "name": "title",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
+      },
+      {
+        "id": "at_course_credits",
+        "ownerId": "ent_course",
+        "ownerKind": "entity",
+        "name": "credits",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
+      },
+      {
+        "id": "at_student_id",
+        "ownerId": "ent_student",
+        "ownerKind": "entity",
+        "name": "student_id",
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false
+      },
+      {
+        "id": "at_student_name",
+        "ownerId": "ent_student",
+        "ownerKind": "entity",
+        "name": "name",
+        "shape": "composite",
+        "identifier": "none",
+        "foreignKey": false
+      },
+      {
+        "id": "at_student_first",
+        "ownerId": "at_student_name",
+        "ownerKind": "attribute",
+        "name": "first",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
+      },
+      {
+        "id": "at_student_last",
+        "ownerId": "at_student_name",
+        "ownerKind": "attribute",
+        "name": "last",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
+      },
+      {
+        "id": "at_student_email",
+        "ownerId": "ent_student",
+        "ownerKind": "entity",
+        "name": "email",
+        "shape": "multivalued",
+        "identifier": "none",
+        "foreignKey": false
+      },
+      {
+        "id": "at_student_age",
+        "ownerId": "ent_student",
+        "ownerKind": "entity",
+        "name": "age",
+        "shape": "derived",
+        "identifier": "none",
+        "foreignKey": false
+      },
+      {
+        "id": "at_student_dept",
+        "ownerId": "ent_student",
+        "ownerKind": "entity",
+        "name": "dept_id",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": true
+      },
+      {
+        "id": "at_semester_term",
+        "ownerId": "ent_semester",
+        "ownerKind": "entity",
+        "name": "term",
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false
+      },
+      {
+        "id": "at_employee_id",
+        "ownerId": "ent_employee",
+        "ownerKind": "entity",
+        "name": "emp_id",
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false
+      },
+      {
+        "id": "at_enrolls_grade",
+        "ownerId": "rel_enrolls",
+        "ownerKind": "relationship",
+        "name": "grade",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
+      }
+    ],
+    "relationships": [
+      {
+        "id": "rel_offers",
+        "name": "offers",
+        "kind": "identifying",
+        "ends": [
+          {
+            "entityId": "ent_department",
+            "cardinality": "1",
+            "participation": "total",
+            "role": null
+          },
+          {
+            "entityId": "ent_course",
+            "cardinality": "N",
+            "participation": "total",
+            "role": null
+          }
+        ]
+      },
+      {
+        "id": "rel_enrolls",
+        "name": "enrolls",
+        "kind": "regular",
+        "ends": [
+          {
+            "entityId": "ent_student",
+            "cardinality": "M",
+            "participation": "partial",
+            "role": null
+          },
+          {
+            "entityId": "ent_course",
+            "cardinality": "N",
+            "participation": "partial",
+            "role": null
+          }
+        ]
+      },
+      {
+        "id": "rel_takes",
+        "name": "takes",
+        "kind": "regular",
+        "ends": [
+          {
+            "entityId": "ent_student",
+            "cardinality": "M",
+            "participation": "partial",
+            "role": null
+          },
+          {
+            "entityId": "ent_course",
+            "cardinality": "N",
+            "participation": "partial",
+            "role": null
+          },
+          {
+            "entityId": "ent_semester",
+            "cardinality": "1",
+            "participation": "partial",
+            "role": null
+          }
+        ]
+      },
+      {
+        "id": "rel_supervises",
+        "name": "supervises",
+        "kind": "regular",
+        "ends": [
+          {
+            "entityId": "ent_employee",
+            "cardinality": "1",
+            "participation": "partial",
+            "role": "supervisor"
+          },
+          {
+            "entityId": "ent_employee",
+            "cardinality": "N",
+            "participation": "partial",
+            "role": "supervisee"
+          }
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "positions": {
+      "ent_department": {
+        "x": 80,
+        "y": 80
+      },
+      "ent_course": {
+        "x": 760,
+        "y": 80
+      },
+      "ent_student": {
+        "x": 700,
+        "y": 560
+      },
+      "ent_semester": {
+        "x": 1400,
+        "y": 560
+      },
+      "ent_employee": {
+        "x": 120,
+        "y": 700
+      },
+      "rel_offers": {
+        "x": 420,
+        "y": 90
+      },
+      "rel_enrolls": {
+        "x": 740,
+        "y": 320
+      },
+      "rel_takes": {
+        "x": 1120,
+        "y": 360
+      },
+      "rel_supervises": {
+        "x": 140,
+        "y": 920
+      },
+      "at_dept_id": {
+        "x": -220,
+        "y": -120
+      },
+      "at_dept_name": {
+        "x": 20,
+        "y": -150
+      },
+      "at_course_code": {
+        "x": 220,
+        "y": -130
+      },
+      "at_course_title": {
+        "x": 280,
+        "y": 30
+      },
+      "at_course_credits": {
+        "x": 260,
+        "y": 150
+      },
+      "at_student_id": {
+        "x": -280,
+        "y": -40
+      },
+      "at_student_name": {
+        "x": -120,
+        "y": 200
+      },
+      "at_student_first": {
+        "x": -150,
+        "y": 130
+      },
+      "at_student_last": {
+        "x": 60,
+        "y": 150
+      },
+      "at_student_email": {
+        "x": 160,
+        "y": 200
+      },
+      "at_student_age": {
+        "x": 300,
+        "y": 60
+      },
+      "at_student_dept": {
+        "x": -300,
+        "y": 90
+      },
+      "at_semester_term": {
+        "x": 200,
+        "y": 80
+      },
+      "at_employee_id": {
+        "x": -220,
+        "y": -90
+      },
+      "at_enrolls_grade": {
+        "x": -230,
+        "y": 40
+      }
+    }
+  },
+  "presentation": {
+    "theme": {
+      "entity": "#333333",
+      "relationship": "#333333",
+      "attribute": "#333333"
+    },
+    "colors": {
+      "ent_student": "#2563eb",
+      "ent_course": "#047857"
+    }
+  },
+  "dismissedHints": []
+}

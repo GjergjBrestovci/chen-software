@@ -146,15 +146,36 @@ describe('attributeOffsetFor', () => {
     expect(() => attributeOffsetFor(sample(), 'ghost', 'x')).toThrow(ModelError);
   });
 
-  it('rejects an attribute as an owner', () => {
+  it('places a part around a composite attribute', () => {
     let document = sample();
     document = addAttribute(document, {
-      id: 'isbn',
+      id: 'name',
       ownerId: 'book',
-      name: 'isbn',
+      name: 'name',
+      shape: 'composite',
       offset: { x: 0, y: 0 },
     });
-    expect(() => attributeOffsetFor(document, 'isbn', 'x')).toThrow(ModelError);
+
+    const offset = attributeOffsetFor(document, 'name', 'first');
+
+    expect(Number.isFinite(offset.x)).toBe(true);
+    expect(Number.isFinite(offset.y)).toBe(true);
+  });
+
+  it('sizes a composite owner as an ellipse, not a rectangle', () => {
+    let document = sample();
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'book',
+      name: 'name',
+      shape: 'composite',
+      offset: { x: 0, y: 0 },
+    });
+
+    // An ellipse owner is shorter than an entity owner, so its parts sit closer.
+    const aroundAttribute = attributeOffsetFor(document, 'name', 'first');
+    const aroundEntity = attributeOffsetFor(document, 'book', 'isbn');
+    expect(Math.abs(aroundAttribute.y)).toBeLessThan(Math.abs(aroundEntity.y));
   });
 
   it('copes with an owner that has no saved position', () => {

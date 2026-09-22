@@ -4,30 +4,52 @@ export type Id = string;
 /** Chen cardinality. `M` and `N` both mean "many"; the letter is a style choice. */
 export type Cardinality = '1' | 'N' | 'M';
 
-/** What an attribute can hang off. Widened in phase 2 only if new owners appear. */
-export type OwnerKind = 'entity' | 'relationship';
+/** Whether every instance of an entity must take part in a relationship. */
+export type Participation = 'partial' | 'total';
 
-/** Attribute flavour. Phase 2 adds `partial-key`, `multivalued`, `derived`, `composite`. */
-export type AttributeKind = 'simple' | 'key';
+/** What an attribute can hang off. `attribute` means a part of a composite. */
+export type OwnerKind = 'entity' | 'relationship' | 'attribute';
+
+/** How an attribute's ellipse is drawn (SPEC.md §6). */
+export type AttributeShape = 'simple' | 'composite' | 'multivalued' | 'derived';
+
+/** How an attribute's name is underlined (SPEC.md §6). */
+export type AttributeIdentifier = 'none' | 'key' | 'partial';
+
+export type EntityKind = 'regular' | 'weak';
+
+export type RelationshipKind = 'regular' | 'identifying';
 
 /** Discriminator for "what sort of thing is this id?" lookups. */
 export type ElementKind = 'entity' | 'relationship' | 'attribute';
 
-/** Index into `Relationship.ends`. Phase 2 widens `ends` to n-ary. */
-export type EndIndex = 0 | 1;
+/** Hex colour, e.g. `#2563eb`. Validated by the schema. */
+export type Color = string;
 
 export interface Entity {
   id: Id;
   name: string;
+  kind: EntityKind;
 }
 
 export interface Attribute {
   id: Id;
-  /** Id of the owning entity or relationship. */
+  /** Id of the owning entity, relationship, or composite attribute. */
   ownerId: Id;
   ownerKind: OwnerKind;
   name: string;
-  kind: AttributeKind;
+  shape: AttributeShape;
+  /**
+   * The ER identifier, drawn as an underline. Belongs to entity attributes
+   * only; the checks in SPEC.md §7 flag it anywhere else rather than the file
+   * being rejected.
+   */
+  identifier: AttributeIdentifier;
+  /**
+   * Relational, not ER, and independent of `identifier`: an attribute can be a
+   * primary key and a foreign key at once. Drawn as a cable marker.
+   */
+  foreignKey: boolean;
 }
 
 export interface RelationshipEnd {
@@ -39,16 +61,20 @@ export interface RelationshipEnd {
    * `null` means the student has not decided yet.
    */
   cardinality: Cardinality | null;
+  participation: Participation;
+  /** Shown on self-relationship ends; `null` elsewhere. */
+  role: string | null;
 }
 
 export interface Relationship {
   id: Id;
   name: string;
-  /** Widened to `RelationshipEnd[]` in phase 2 for ternary relationships. */
-  ends: [RelationshipEnd, RelationshipEnd];
+  kind: RelationshipKind;
+  /** At least two. The same entity may appear more than once (self-relationship). */
+  ends: RelationshipEnd[];
 }
 
-/** The semantic model. Correctness depends on this alone, never on `Layout`. */
+/** The semantic model. Correctness depends on this alone, never on layout or colour. */
 export interface ErModel {
   entities: Entity[];
   attributes: Attribute[];
@@ -68,11 +94,30 @@ export interface Layout {
   positions: Record<Id, Position>;
 }
 
+/** Default colour per component kind. */
+export interface ComponentTheme {
+  entity: Color;
+  relationship: Color;
+  attribute: Color;
+}
+
+/**
+ * Everything about how the diagram looks that is not position. Kept out of
+ * `ErModel` so that recolouring a diagram cannot change a single check result
+ * (SPEC.md §1, product rule 2).
+ */
+export interface Presentation {
+  theme: ComponentTheme;
+  /** Per-element overrides, keyed by element id. Beats the theme. */
+  colors: Record<Id, Color>;
+}
+
 export interface ErDocument {
-  version: 1;
+  version: 2;
   title: string;
   model: ErModel;
   layout: Layout;
+  presentation: Presentation;
   /** Keys produced by `model/dismissals.ts`. */
   dismissedHints: string[];
 }

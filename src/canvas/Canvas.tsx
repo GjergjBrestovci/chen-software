@@ -97,7 +97,7 @@ export function Canvas(): ReactElement {
   const createRelationship = useCallback(
     (firstId: Id, secondId: Id) => {
       const position = midpointBetween(scene.boxes, firstId, secondId, NEW_NAME);
-      startRenaming(addRelationshipBetween(firstId, secondId, position));
+      startRenaming(addRelationshipBetween([firstId, secondId], position));
     },
     [addRelationshipBetween, scene.boxes, startRenaming],
   );

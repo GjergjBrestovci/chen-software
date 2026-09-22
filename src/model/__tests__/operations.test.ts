@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ModelError } from '../errors';
 import { dismissalKey } from '../dismissals';
+import { DEFAULT_THEME } from '../presentation';
 import {
   addAttribute,
   addEntity,
@@ -10,7 +11,8 @@ import {
   moveElements,
   orphanedPositionIds,
   renameElement,
-  setAttributeKind,
+  setAttributeIdentifier,
+  setAttributeShape,
   setCardinality,
   setTitle,
 } from '../operations';
@@ -37,14 +39,14 @@ function sample(): ErDocument {
     id: 'pubName',
     ownerId: 'pub',
     name: 'name',
-    kind: 'key',
+    identifier: 'key',
     offset: { x: -40, y: -60 },
   });
   document = addAttribute(document, {
     id: 'bookIsbn',
     ownerId: 'book',
     name: 'isbn',
-    kind: 'key',
+    identifier: 'key',
     offset: { x: 40, y: -60 },
   });
   document = addAttribute(document, {
@@ -57,11 +59,13 @@ function sample(): ErDocument {
 }
 
 describe('createEmptyDocument', () => {
-  it('starts at version 1 with nothing in it', () => {
+  it('starts at the current version with nothing in it', () => {
     const document = createEmptyDocument();
-    expect(document.version).toBe(1);
+    expect(document.version).toBe(2);
     expect(document.model).toEqual({ entities: [], attributes: [], relationships: [] });
     expect(document.layout.positions).toEqual({});
+    expect(document.presentation.colors).toEqual({});
+    expect(document.presentation.theme).toEqual(DEFAULT_THEME);
     expect(document.dismissedHints).toEqual([]);
   });
 
@@ -81,7 +85,7 @@ describe('addEntity', () => {
       name: 'BOOK',
       position: { x: 5, y: 7 },
     });
-    expect(findEntity(document.model, 'e1')).toEqual({ id: 'e1', name: 'BOOK' });
+    expect(findEntity(document.model, 'e1')).toEqual({ id: 'e1', name: 'BOOK', kind: 'regular' });
     expect(document.layout.positions['e1']).toEqual({ x: 5, y: 7 });
   });
 
@@ -109,8 +113,8 @@ describe('addRelationship', () => {
   it('creates both ends with no cardinality chosen yet', () => {
     const relationship = findRelationship(sample().model, 'rel');
     expect(relationship?.ends).toEqual([
-      { entityId: 'pub', cardinality: null },
-      { entityId: 'book', cardinality: null },
+      { entityId: 'pub', cardinality: null, participation: 'partial', role: null },
+      { entityId: 'book', cardinality: null, participation: 'partial', role: null },
     ]);
   });
 
@@ -127,11 +131,40 @@ describe('addRelationship', () => {
     ).toThrow(ModelError);
   });
 
-  it('rejects a self-relationship, which is phase 2', () => {
+  it('accepts a self-relationship', () => {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'a', name: 'A', position: origin });
+    document = addRelationship(document, {
+      id: 'r',
+      name: 'supervises',
+      entityIds: ['a', 'a'],
+      position: origin,
+    });
+    expect(findRelationship(document.model, 'r')?.ends.map((end) => end.entityId)).toEqual([
+      'a',
+      'a',
+    ]);
+  });
+
+  it('accepts a ternary relationship', () => {
+    let document = createEmptyDocument();
+    for (const id of ['a', 'b', 'c']) {
+      document = addEntity(document, { id, name: id.toUpperCase(), position: origin });
+    }
+    document = addRelationship(document, {
+      id: 'r',
+      name: 'takes',
+      entityIds: ['a', 'b', 'c'],
+      position: origin,
+    });
+    expect(findRelationship(document.model, 'r')?.ends).toHaveLength(3);
+  });
+
+  it('rejects fewer than two ends', () => {
     let document = createEmptyDocument();
     document = addEntity(document, { id: 'a', name: 'A', position: origin });
     expect(() =>
-      addRelationship(document, { id: 'r', name: 'x', entityIds: ['a', 'a'], position: origin }),
+      addRelationship(document, { id: 'r', name: 'x', entityIds: ['a'], position: origin }),
     ).toThrow(ModelError);
   });
 
@@ -154,8 +187,11 @@ describe('addAttribute', () => {
     expect(findAttribute(model, 'relSince')?.ownerKind).toBe('relationship');
   });
 
-  it('defaults to a simple attribute', () => {
-    expect(findAttribute(sample().model, 'relSince')?.kind).toBe('simple');
+  it('defaults to a simple, non-identifying, non-foreign attribute', () => {
+    const attribute = findAttribute(sample().model, 'relSince');
+    expect(attribute?.shape).toBe('simple');
+    expect(attribute?.identifier).toBe('none');
+    expect(attribute?.foreignKey).toBe(false);
   });
 
   it('stores the offset relative to the owner', () => {
@@ -174,10 +210,27 @@ describe('addAttribute', () => {
         id: 'x',
         ownerId: 'rel',
         name: 'a',
-        kind: 'key',
+        identifier: 'key',
         offset: origin,
       }),
     ).toThrow(ModelError);
+  });
+
+  it('rejects a part on an attribute that is not composite', () => {
+    expect(() =>
+      addAttribute(sample(), { id: 'x', ownerId: 'pubName', name: 'part', offset: origin }),
+    ).toThrow(ModelError);
+  });
+
+  it('accepts a part on a composite attribute', () => {
+    let document = setAttributeShape(sample(), 'pubName', 'composite');
+    document = addAttribute(document, {
+      id: 'first',
+      ownerId: 'pubName',
+      name: 'first',
+      offset: origin,
+    });
+    expect(findAttribute(document.model, 'first')?.ownerKind).toBe('attribute');
   });
 
   it('rejects a duplicate id', () => {
@@ -208,25 +261,30 @@ describe('renameElement', () => {
   });
 });
 
-describe('setAttributeKind', () => {
+describe('setAttributeIdentifier', () => {
   it('promotes and demotes an entity attribute', () => {
-    let document = setAttributeKind(sample(), { id: 'pubName', kind: 'simple' });
-    expect(findAttribute(document.model, 'pubName')?.kind).toBe('simple');
-    document = setAttributeKind(document, { id: 'pubName', kind: 'key' });
-    expect(findAttribute(document.model, 'pubName')?.kind).toBe('key');
+    let document = setAttributeIdentifier(sample(), 'pubName', 'none');
+    expect(findAttribute(document.model, 'pubName')?.identifier).toBe('none');
+    document = setAttributeIdentifier(document, 'pubName', 'key');
+    expect(findAttribute(document.model, 'pubName')?.identifier).toBe('key');
   });
 
-  it('refuses to mark a relationship attribute as key', () => {
-    expect(() => setAttributeKind(sample(), { id: 'relSince', kind: 'key' })).toThrow(ModelError);
+  it('allows a partial key, which the checks judge against the entity kind', () => {
+    const document = setAttributeIdentifier(sample(), 'pubName', 'partial');
+    expect(findAttribute(document.model, 'pubName')?.identifier).toBe('partial');
   });
 
-  it('still allows demoting a relationship attribute', () => {
-    const document = setAttributeKind(sample(), { id: 'relSince', kind: 'simple' });
-    expect(findAttribute(document.model, 'relSince')?.kind).toBe('simple');
+  it('refuses to mark a relationship attribute as a key', () => {
+    expect(() => setAttributeIdentifier(sample(), 'relSince', 'key')).toThrow(ModelError);
+  });
+
+  it('still allows clearing a relationship attribute', () => {
+    const document = setAttributeIdentifier(sample(), 'relSince', 'none');
+    expect(findAttribute(document.model, 'relSince')?.identifier).toBe('none');
   });
 
   it('rejects an unknown attribute', () => {
-    expect(() => setAttributeKind(sample(), { id: 'ghost', kind: 'key' })).toThrow(ModelError);
+    expect(() => setAttributeIdentifier(sample(), 'ghost', 'key')).toThrow(ModelError);
   });
 });
 
@@ -242,9 +300,9 @@ describe('setCardinality', () => {
       endIndex: 1,
       cardinality: 'N',
     });
-    expect(findRelationship(document.model, 'rel')?.ends).toEqual([
-      { entityId: 'pub', cardinality: '1' },
-      { entityId: 'book', cardinality: 'N' },
+    expect(findRelationship(document.model, 'rel')?.ends.map((end) => end.cardinality)).toEqual([
+      '1',
+      'N',
     ]);
   });
 
@@ -259,7 +317,7 @@ describe('setCardinality', () => {
       endIndex: 0,
       cardinality: null,
     });
-    expect(findRelationship(document.model, 'rel')?.ends[0].cardinality).toBeNull();
+    expect(findRelationship(document.model, 'rel')?.ends[0]?.cardinality).toBeNull();
   });
 
   it('rejects an unknown relationship', () => {

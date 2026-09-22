@@ -30,8 +30,8 @@ export const messages = {
       `The attribute ${attribute} does not match the kind of element it is attached to, so nothing was loaded.`,
     unknownRelationshipEntity: (relationship: string): string =>
       `The relationship ${relationship} connects to an entity that is missing from the file, so nothing was loaded.`,
-    selfRelationshipUnsupported: (relationship: string): string =>
-      `The relationship ${relationship} connects an entity to itself. ChenLab cannot open that yet, so nothing was loaded.`,
+    attributeOwnerCycle: (attribute: string): string =>
+      `The attribute ${attribute} is part of itself, which cannot be drawn, so nothing was loaded.`,
     placedMissingPositions: (count: number): string =>
       count === 1
         ? 'One element had no saved position and was placed on the canvas for you.'

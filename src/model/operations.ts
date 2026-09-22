@@ -2,6 +2,7 @@ import { produce } from 'immer';
 import { messages } from '../i18n/messages.en';
 import { parseDismissalKey } from './dismissals';
 import { ModelError } from './errors';
+import { createPresentation } from './presentation';
 import {
   allElementIds,
   attributesOf,
@@ -9,9 +10,23 @@ import {
   findElementKind,
   findEntity,
   findRelationship,
+  isDescendantOf,
   relationshipsTouching,
 } from './queries';
-import type { AttributeKind, Cardinality, EndIndex, ErDocument, Id, Position } from './types';
+import type {
+  AttributeIdentifier,
+  AttributeShape,
+  Cardinality,
+  Color,
+  ComponentTheme,
+  EntityKind,
+  ErDocument,
+  Id,
+  Participation,
+  Position,
+  Relationship,
+  RelationshipKind,
+} from './types';
 
 /**
  * Pure model operations. Every function takes a document and returns a new one;
@@ -26,12 +41,16 @@ import type { AttributeKind, Cardinality, EndIndex, ErDocument, Id, Position } f
  * gone so that deleting a stale selection is a harmless no-op.
  */
 
+/** Ends below this and a relationship is no longer a relationship (SPEC.md §4). */
+export const MIN_RELATIONSHIP_ENDS = 2;
+
 export function createEmptyDocument(title: string = messages.document.untitled): ErDocument {
   return {
-    version: 1,
+    version: 2,
     title,
     model: { entities: [], attributes: [], relationships: [] },
     layout: { positions: {} },
+    presentation: createPresentation(),
     dismissedHints: [],
   };
 }
@@ -42,17 +61,28 @@ function assertIdIsFree(document: ErDocument, id: Id): void {
   }
 }
 
+function endAt(relationship: Relationship, endIndex: number): void {
+  if (!Number.isInteger(endIndex) || endIndex < 0 || endIndex >= relationship.ends.length) {
+    throw new ModelError(`Relationship "${relationship.id}" has no end ${String(endIndex)}.`);
+  }
+}
+
 export interface AddEntityParams {
   id: Id;
   name: string;
   position: Position;
+  kind?: EntityKind;
 }
 
 export function addEntity(document: ErDocument, params: AddEntityParams): ErDocument {
   assertIdIsFree(document, params.id);
 
   return produce(document, (draft) => {
-    draft.model.entities.push({ id: params.id, name: params.name });
+    draft.model.entities.push({
+      id: params.id,
+      name: params.name,
+      kind: params.kind ?? 'regular',
+    });
     draft.layout.positions[params.id] = { ...params.position };
   });
 }
@@ -60,33 +90,36 @@ export function addEntity(document: ErDocument, params: AddEntityParams): ErDocu
 export interface AddRelationshipParams {
   id: Id;
   name: string;
-  /** The two entities being related, in end order. */
-  entityIds: [Id, Id];
+  /** Participating entities, in end order. Two or more; repeats allowed. */
+  entityIds: readonly Id[];
   position: Position;
+  kind?: RelationshipKind;
 }
 
 export function addRelationship(document: ErDocument, params: AddRelationshipParams): ErDocument {
   assertIdIsFree(document, params.id);
 
-  const [firstId, secondId] = params.entityIds;
+  if (params.entityIds.length < MIN_RELATIONSHIP_ENDS) {
+    throw new ModelError('A relationship must connect at least two ends.');
+  }
   for (const entityId of params.entityIds) {
     if (!findEntity(document.model, entityId)) {
       throw new ModelError(`Unknown entity "${entityId}".`);
     }
-  }
-  if (firstId === secondId) {
-    // Self-relationships need role names and double diamonds: phase 2 (SPEC.md §2).
-    throw new ModelError('A relationship must connect two different entities.');
   }
 
   return produce(document, (draft) => {
     draft.model.relationships.push({
       id: params.id,
       name: params.name,
-      ends: [
-        { entityId: firstId, cardinality: null },
-        { entityId: secondId, cardinality: null },
-      ],
+      kind: params.kind ?? 'regular',
+      // The same entity twice is a self-relationship, which is supported.
+      ends: params.entityIds.map((entityId) => ({
+        entityId,
+        cardinality: null,
+        participation: 'partial',
+        role: null,
+      })),
     });
     draft.layout.positions[params.id] = { ...params.position };
   });
@@ -96,7 +129,9 @@ export interface AddAttributeParams {
   id: Id;
   ownerId: Id;
   name: string;
-  kind?: AttributeKind;
+  shape?: AttributeShape;
+  identifier?: AttributeIdentifier;
+  foreignKey?: boolean;
   /** Offset relative to the owner, not an absolute canvas position. */
   offset: Position;
 }
@@ -105,14 +140,22 @@ export function addAttribute(document: ErDocument, params: AddAttributeParams): 
   assertIdIsFree(document, params.id);
 
   const ownerKind = findElementKind(document.model, params.ownerId);
-  if (ownerKind !== 'entity' && ownerKind !== 'relationship') {
+  if (ownerKind === undefined) {
     throw new ModelError(`Unknown attribute owner "${params.ownerId}".`);
   }
 
-  const kind: AttributeKind = params.kind ?? 'simple';
-  if (kind === 'key' && ownerKind === 'relationship') {
-    // SPEC.md §2: relationship attributes are non-key.
-    throw new ModelError('A relationship attribute cannot be a key attribute.');
+  if (ownerKind === 'attribute') {
+    const owner = findAttribute(document.model, params.ownerId);
+    if (owner?.shape !== 'composite') {
+      // Making the owner composite on the student's behalf would be the app
+      // reclassifying their model (SPEC.md §1, product rule 1).
+      throw new ModelError(`Attribute "${params.ownerId}" is not composite, so it has no parts.`);
+    }
+  }
+
+  const identifier: AttributeIdentifier = params.identifier ?? 'none';
+  if (identifier !== 'none' && ownerKind !== 'entity') {
+    throw new ModelError('Only an entity attribute can be a key.');
   }
 
   return produce(document, (draft) => {
@@ -121,7 +164,9 @@ export function addAttribute(document: ErDocument, params: AddAttributeParams): 
       ownerId: params.ownerId,
       ownerKind,
       name: params.name,
-      kind,
+      shape: params.shape ?? 'simple',
+      identifier,
+      foreignKey: params.foreignKey ?? false,
     });
     draft.layout.positions[params.id] = { ...params.offset };
   });
@@ -129,7 +174,7 @@ export function addAttribute(document: ErDocument, params: AddAttributeParams): 
 
 export interface RenameElementParams {
   id: Id;
-  /** May be empty; the validator flags that rather than the operation. */
+  /** May be empty; the checks flag that rather than the operation. */
   name: string;
 }
 
@@ -152,45 +197,220 @@ export function renameElement(document: ErDocument, params: RenameElementParams)
   });
 }
 
-export interface SetAttributeKindParams {
-  id: Id;
-  kind: AttributeKind;
-}
-
-export function setAttributeKind(document: ErDocument, params: SetAttributeKindParams): ErDocument {
-  const attribute = findAttribute(document.model, params.id);
-  if (!attribute) {
-    throw new ModelError(`Unknown attribute "${params.id}".`);
-  }
-  if (params.kind === 'key' && attribute.ownerKind === 'relationship') {
-    throw new ModelError('A relationship attribute cannot be a key attribute.');
+export function setEntityKind(document: ErDocument, id: Id, kind: EntityKind): ErDocument {
+  if (!findEntity(document.model, id)) {
+    throw new ModelError(`Unknown entity "${id}".`);
   }
 
   return produce(document, (draft) => {
-    const target = findAttribute(draft.model, params.id);
+    const entity = findEntity(draft.model, id);
+    if (entity) {
+      entity.kind = kind;
+    }
+  });
+}
+
+export function setRelationshipKind(
+  document: ErDocument,
+  id: Id,
+  kind: RelationshipKind,
+): ErDocument {
+  if (!findRelationship(document.model, id)) {
+    throw new ModelError(`Unknown relationship "${id}".`);
+  }
+
+  return produce(document, (draft) => {
+    const relationship = findRelationship(draft.model, id);
+    if (relationship) {
+      relationship.kind = kind;
+    }
+  });
+}
+
+export function setAttributeShape(document: ErDocument, id: Id, shape: AttributeShape): ErDocument {
+  const attribute = findAttribute(document.model, id);
+  if (!attribute) {
+    throw new ModelError(`Unknown attribute "${id}".`);
+  }
+  if (shape !== 'composite' && attributesOf(document.model, id).length > 0) {
+    // Silently discarding the parts would delete the student's work.
+    throw new ModelError(`Attribute "${id}" still has parts, so it must stay composite.`);
+  }
+
+  return produce(document, (draft) => {
+    const target = findAttribute(draft.model, id);
     if (target) {
-      target.kind = params.kind;
+      target.shape = shape;
+    }
+  });
+}
+
+export function setAttributeIdentifier(
+  document: ErDocument,
+  id: Id,
+  identifier: AttributeIdentifier,
+): ErDocument {
+  const attribute = findAttribute(document.model, id);
+  if (!attribute) {
+    throw new ModelError(`Unknown attribute "${id}".`);
+  }
+  if (identifier !== 'none' && attribute.ownerKind !== 'entity') {
+    throw new ModelError('Only an entity attribute can be a key.');
+  }
+
+  return produce(document, (draft) => {
+    const target = findAttribute(draft.model, id);
+    if (target) {
+      target.identifier = identifier;
+    }
+  });
+}
+
+export function setAttributeForeignKey(
+  document: ErDocument,
+  id: Id,
+  foreignKey: boolean,
+): ErDocument {
+  if (!findAttribute(document.model, id)) {
+    throw new ModelError(`Unknown attribute "${id}".`);
+  }
+
+  return produce(document, (draft) => {
+    const target = findAttribute(draft.model, id);
+    if (target) {
+      target.foreignKey = foreignKey;
     }
   });
 }
 
 export interface SetCardinalityParams {
   relationshipId: Id;
-  endIndex: EndIndex;
+  endIndex: number;
   /** `null` clears the choice, which the Inspector allows. */
   cardinality: Cardinality | null;
 }
 
 export function setCardinality(document: ErDocument, params: SetCardinalityParams): ErDocument {
-  if (!findRelationship(document.model, params.relationshipId)) {
+  const relationship = findRelationship(document.model, params.relationshipId);
+  if (!relationship) {
     throw new ModelError(`Unknown relationship "${params.relationshipId}".`);
+  }
+  endAt(relationship, params.endIndex);
+
+  return produce(document, (draft) => {
+    const target = findRelationship(draft.model, params.relationshipId);
+    const end = target?.ends[params.endIndex];
+    if (end) {
+      end.cardinality = params.cardinality;
+    }
+  });
+}
+
+export interface SetParticipationParams {
+  relationshipId: Id;
+  endIndex: number;
+  participation: Participation;
+}
+
+export function setParticipation(document: ErDocument, params: SetParticipationParams): ErDocument {
+  const relationship = findRelationship(document.model, params.relationshipId);
+  if (!relationship) {
+    throw new ModelError(`Unknown relationship "${params.relationshipId}".`);
+  }
+  endAt(relationship, params.endIndex);
+
+  return produce(document, (draft) => {
+    const end = findRelationship(draft.model, params.relationshipId)?.ends[params.endIndex];
+    if (end) {
+      end.participation = params.participation;
+    }
+  });
+}
+
+export interface SetEndRoleParams {
+  relationshipId: Id;
+  endIndex: number;
+  /** `null` removes the role name. */
+  role: string | null;
+}
+
+export function setEndRole(document: ErDocument, params: SetEndRoleParams): ErDocument {
+  const relationship = findRelationship(document.model, params.relationshipId);
+  if (!relationship) {
+    throw new ModelError(`Unknown relationship "${params.relationshipId}".`);
+  }
+  endAt(relationship, params.endIndex);
+
+  return produce(document, (draft) => {
+    const end = findRelationship(draft.model, params.relationshipId)?.ends[params.endIndex];
+    if (end) {
+      end.role = params.role;
+    }
+  });
+}
+
+export function addRelationshipEnd(
+  document: ErDocument,
+  relationshipId: Id,
+  entityId: Id,
+): ErDocument {
+  if (!findRelationship(document.model, relationshipId)) {
+    throw new ModelError(`Unknown relationship "${relationshipId}".`);
+  }
+  if (!findEntity(document.model, entityId)) {
+    throw new ModelError(`Unknown entity "${entityId}".`);
   }
 
   return produce(document, (draft) => {
-    const relationship = findRelationship(draft.model, params.relationshipId);
-    if (relationship) {
-      relationship.ends[params.endIndex].cardinality = params.cardinality;
+    findRelationship(draft.model, relationshipId)?.ends.push({
+      entityId,
+      cardinality: null,
+      participation: 'partial',
+      role: null,
+    });
+  });
+}
+
+export function removeRelationshipEnd(
+  document: ErDocument,
+  relationshipId: Id,
+  endIndex: number,
+): ErDocument {
+  const relationship = findRelationship(document.model, relationshipId);
+  if (!relationship) {
+    throw new ModelError(`Unknown relationship "${relationshipId}".`);
+  }
+  endAt(relationship, endIndex);
+  if (relationship.ends.length <= MIN_RELATIONSHIP_ENDS) {
+    throw new ModelError('A relationship must keep at least two ends.');
+  }
+
+  return produce(document, (draft) => {
+    findRelationship(draft.model, relationshipId)?.ends.splice(endIndex, 1);
+  });
+}
+
+/** Sets a component's own colour, or `null` to fall back to the theme. */
+export function setElementColor(document: ErDocument, id: Id, color: Color | null): ErDocument {
+  if (findElementKind(document.model, id) === undefined) {
+    throw new ModelError(`Unknown element "${id}".`);
+  }
+
+  return produce(document, (draft) => {
+    if (color === null) {
+      draft.presentation.colors = Object.fromEntries(
+        Object.entries(draft.presentation.colors).filter(([key]) => key !== id),
+      );
+    } else {
+      draft.presentation.colors[id] = color;
     }
+  });
+}
+
+/** Replaces the document-wide theme. Per-component overrides are untouched. */
+export function setTheme(document: ErDocument, theme: ComponentTheme): ErDocument {
+  return produce(document, (draft) => {
+    draft.presentation.theme = { ...theme };
   });
 }
 
@@ -201,7 +421,7 @@ export interface ElementMove {
 
 /**
  * Moves elements. A whole drag gesture is one call, so it becomes one undo
- * entry (SPEC.md §5). Layout never affects validation (SPEC.md §1.3).
+ * entry (SPEC.md §5). Layout never affects the checks (SPEC.md §1).
  */
 export function moveElements(document: ErDocument, moves: readonly ElementMove[]): ErDocument {
   for (const move of moves) {
@@ -232,15 +452,26 @@ export function setTitle(document: ErDocument, title: string): ErDocument {
 /**
  * Collects everything that must disappear along with `ids` (SPEC.md §4):
  * deleting an entity also removes its attributes, every relationship touching
- * it, and those relationships' attributes.
+ * it, and those relationships' attributes. Attributes take their parts with
+ * them, recursively.
  */
 function collectCascade(document: ErDocument, ids: readonly Id[]): Set<Id> {
   const removed = new Set<Id>();
 
+  const removeAttributeTree = (attributeId: Id): void => {
+    if (removed.has(attributeId)) {
+      return;
+    }
+    removed.add(attributeId);
+    for (const part of attributesOf(document.model, attributeId)) {
+      removeAttributeTree(part.id);
+    }
+  };
+
   const removeWithAttributes = (ownerId: Id): void => {
     removed.add(ownerId);
     for (const attribute of attributesOf(document.model, ownerId)) {
-      removed.add(attribute.id);
+      removeAttributeTree(attribute.id);
     }
   };
 
@@ -256,7 +487,7 @@ function collectCascade(document: ErDocument, ids: readonly Id[]): Set<Id> {
         removeWithAttributes(id);
         break;
       case 'attribute':
-        removed.add(id);
+        removeAttributeTree(id);
         break;
       default:
         // Already gone. Deleting a stale selection is a no-op, not an error.
@@ -301,6 +532,9 @@ export function deleteElements(document: ErDocument, ids: readonly Id[]): ErDocu
     draft.layout.positions = Object.fromEntries(
       Object.entries(draft.layout.positions).filter(([id]) => !removed.has(id)),
     );
+    draft.presentation.colors = Object.fromEntries(
+      Object.entries(draft.presentation.colors).filter(([id]) => !removed.has(id)),
+    );
 
     draft.dismissedHints = pruneDismissals(draft.dismissedHints, removed);
   });
@@ -310,4 +544,9 @@ export function deleteElements(document: ErDocument, ids: readonly Id[]): ErDocu
 export function orphanedPositionIds(document: ErDocument): Id[] {
   const known = new Set(allElementIds(document.model));
   return Object.keys(document.layout.positions).filter((id) => !known.has(id));
+}
+
+/** True when moving `attributeId` under `ownerId` would create a cycle. */
+export function wouldCycle(document: ErDocument, attributeId: Id, ownerId: Id): boolean {
+  return attributeId === ownerId || isDescendantOf(document.model, ownerId, attributeId);
 }

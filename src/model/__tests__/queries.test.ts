@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { addAttribute, addEntity, addRelationship, createEmptyDocument } from '../operations';
 import {
   allElementIds,
+  isDescendantOf,
+  rootOwnerOf,
   attributesOf,
   findAttribute,
   findElementKind,
@@ -10,7 +12,7 @@ import {
   findRelationship,
   relationshipsTouching,
 } from '../queries';
-import type { ErDocument } from '../types';
+import type { ErDocument, ErModel } from '../types';
 
 const origin = { x: 0, y: 0 };
 
@@ -81,5 +83,86 @@ describe('findElementName', () => {
 
   it('has no name for an unknown id', () => {
     expect(findElementName(model, 'ghost')).toBeUndefined();
+  });
+});
+
+describe('composite ancestry', () => {
+  /** BOOK ← name(composite) ← first, so `first` is two levels down. */
+  function nested(): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'book', name: 'BOOK', position: origin });
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'book',
+      name: 'name',
+      shape: 'composite',
+      offset: origin,
+    });
+    document = addAttribute(document, {
+      id: 'first',
+      ownerId: 'name',
+      name: 'first',
+      offset: origin,
+    });
+    return document;
+  }
+
+  it('walks a part up to the entity that owns it', () => {
+    expect(rootOwnerOf(nested().model, 'first')?.id).toBe('book');
+    expect(rootOwnerOf(nested().model, 'name')?.id).toBe('book');
+  });
+
+  it('walks up to a relationship owner too', () => {
+    const { model } = sample();
+    expect(rootOwnerOf(model, 'at3')?.id).toBe('r');
+  });
+
+  it('has no root owner for an unknown attribute', () => {
+    expect(rootOwnerOf(nested().model, 'ghost')).toBeUndefined();
+  });
+
+  it('gives up rather than looping on a cyclic model', () => {
+    const document = nested();
+    const cyclic: ErModel = {
+      ...document.model,
+      attributes: document.model.attributes.map((attribute) =>
+        attribute.id === 'name'
+          ? { ...attribute, ownerId: 'first', ownerKind: 'attribute' as const }
+          : attribute,
+      ),
+    };
+    expect(rootOwnerOf(cyclic, 'first')).toBeUndefined();
+  });
+
+  it('has no root owner when the chain is broken', () => {
+    const document = nested();
+    const broken: ErModel = {
+      ...document.model,
+      attributes: document.model.attributes.map((attribute) =>
+        attribute.id === 'name' ? { ...attribute, ownerId: 'ghost' } : attribute,
+      ),
+    };
+    expect(rootOwnerOf(broken, 'first')).toBeUndefined();
+  });
+
+  it('recognises descendants at any depth', () => {
+    const { model } = nested();
+    expect(isDescendantOf(model, 'first', 'name')).toBe(true);
+    expect(isDescendantOf(model, 'first', 'book')).toBe(true);
+    expect(isDescendantOf(model, 'name', 'first')).toBe(false);
+    expect(isDescendantOf(model, 'ghost', 'book')).toBe(false);
+  });
+
+  it('terminates on a cycle instead of hanging', () => {
+    const document = nested();
+    const cyclic: ErModel = {
+      ...document.model,
+      attributes: document.model.attributes.map((attribute) =>
+        attribute.id === 'name'
+          ? { ...attribute, ownerId: 'first', ownerKind: 'attribute' as const }
+          : attribute,
+      ),
+    };
+    expect(isDescendantOf(cyclic, 'first', 'book')).toBe(false);
   });
 });

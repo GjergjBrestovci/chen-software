@@ -7,7 +7,7 @@ import {
   createEmptyDocument,
   setCardinality,
 } from '../../model/operations';
-import { parseErDocumentJson } from '../../model/schema';
+import { readDocumentJson } from '../../persistence/migrations';
 import type { ErDocument } from '../../model/types';
 import { distance, shapeSizeFor } from '../../geometry';
 import type { Point, ShapeBox } from '../../geometry';
@@ -16,7 +16,7 @@ import { attributeEdgeId, buildScene, cardinalityEdgeId, midpointBetween } from 
 import type { AppNode } from '../scene';
 
 function bookstore(): ErDocument {
-  const outcome = parseErDocumentJson(
+  const outcome = readDocumentJson(
     readFileSync(new URL('../../../fixtures/bookstore.erd.json', import.meta.url), 'utf8'),
   );
   if (!outcome.ok) {
@@ -39,7 +39,7 @@ function sample(): ErDocument {
     id: 'isbn',
     ownerId: 'book',
     name: 'isbn',
-    kind: 'key',
+    identifier: 'key',
     offset: { x: 20, y: 140 },
   });
   return document;
@@ -296,16 +296,25 @@ describe('buildScene is defensive about references', () => {
         ...document.model,
         attributes: [
           ...document.model.attributes,
-          { id: 'orphan', ownerId: 'ghost', ownerKind: 'entity', name: 'x', kind: 'simple' },
+          {
+            id: 'orphan',
+            ownerId: 'ghost',
+            ownerKind: 'entity',
+            name: 'x',
+            shape: 'simple',
+            identifier: 'none',
+            foreignKey: false,
+          },
         ],
         relationships: [
           ...document.model.relationships,
           {
             id: 'ghostRel',
             name: 'nowhere',
+            kind: 'regular',
             ends: [
-              { entityId: 'ghost', cardinality: null },
-              { entityId: 'alsoGhost', cardinality: null },
+              { entityId: 'ghost', cardinality: null, participation: 'partial', role: null },
+              { entityId: 'alsoGhost', cardinality: null, participation: 'partial', role: null },
             ],
           },
         ],
@@ -327,5 +336,94 @@ describe('buildScene is defensive about references', () => {
     const { edges } = scene(danglingDocument());
     expect(edges.some((edge) => edge.id === attributeEdgeId('isbn'))).toBe(true);
     expect(edges.some((edge) => edge.id === cardinalityEdgeId('rel', 0))).toBe(true);
+  });
+});
+
+describe('buildScene places composite attributes', () => {
+  /** BOOK at (1000, 500) ← name(composite) ← first, each offset from its owner. */
+  function nested(): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'book', name: 'BOOK', position: { x: 1000, y: 500 } });
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'book',
+      name: 'name',
+      shape: 'composite',
+      offset: { x: 100, y: 200 },
+    });
+    document = addAttribute(document, {
+      id: 'first',
+      ownerId: 'name',
+      name: 'first',
+      offset: { x: 30, y: 60 },
+    });
+    return document;
+  }
+
+  it('parents a part to its composite, not to the entity', () => {
+    const { nodes } = scene(nested());
+    expect(nodeOf(nodes, 'first').parentId).toBe('name');
+  });
+
+  it('keeps a part position relative to its composite, as React Flow expects', () => {
+    const { nodes } = scene(nested());
+    expect(nodeOf(nodes, 'first').position).toEqual({ x: 30, y: 60 });
+  });
+
+  it('accumulates the absolute position down the whole chain', () => {
+    const { boxes } = scene(nested());
+    const first = boxes.get('first');
+    const size = shapeSizeFor('ellipse', 'first');
+
+    // 1000 + 100 + 30 for x, 500 + 200 + 60 for y, plus half the ellipse.
+    expect(first?.center.x).toBeCloseTo(1130 + size.width / 2, 6);
+    expect(first?.center.y).toBeCloseTo(760 + size.height / 2, 6);
+  });
+
+  it('draws the part line to its composite, not off into empty space', () => {
+    const { edges, boxes } = scene(nested());
+    const edge = edges.find((candidate) => candidate.id === attributeEdgeId('first'));
+    const name = boxes.get('name');
+    if (!edge?.data || !name) {
+      throw new Error('expected a line from the part to its composite');
+    }
+    expect(outlineResidual(name, edge.data.segment.end)).toBeLessThan(1e-9);
+  });
+
+  it('lists a composite before its parts, whatever order the model is in', () => {
+    const document = nested();
+    const reversed: ErDocument = {
+      ...document,
+      model: { ...document.model, attributes: [...document.model.attributes].reverse() },
+    };
+
+    const ids = scene(reversed).nodes.map((node) => node.id);
+    expect(ids.indexOf('name')).toBeLessThan(ids.indexOf('first'));
+  });
+
+  it('moves a part when the entity two levels up is dragged', () => {
+    const still = scene(nested()).boxes.get('first');
+    const dragged = scene(nested(), { dragPositions: { book: { x: 1400, y: 500 } } }).boxes.get(
+      'first',
+    );
+    expect(dragged?.center.x).toBeCloseTo((still?.center.x ?? 0) + 400, 6);
+  });
+
+  it('skips an attribute whose owner cannot be placed at all', () => {
+    const document = nested();
+    const orphaned: ErDocument = {
+      ...document,
+      model: {
+        ...document.model,
+        attributes: document.model.attributes.map((attribute) =>
+          attribute.id === 'name' ? { ...attribute, ownerId: 'ghost' } : attribute,
+        ),
+      },
+    };
+
+    const { nodes, edges } = scene(orphaned);
+    // Neither the composite nor the part below it can be positioned.
+    expect(nodes.map((node) => node.id)).toEqual(['book']);
+    expect(edges).toEqual([]);
   });
 });

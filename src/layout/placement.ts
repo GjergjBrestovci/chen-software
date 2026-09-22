@@ -1,7 +1,7 @@
 import { shapeSizeFor } from '../geometry';
 import type { Size } from '../geometry';
 import { ModelError } from '../model/errors';
-import { attributesOf, findEntity, findRelationship } from '../model/queries';
+import { attributesOf, findElementRef } from '../model/queries';
 import type { ErDocument, Id, Position } from '../model/types';
 import { shapeKindFor } from './types';
 
@@ -119,13 +119,13 @@ export function attributeOffsetFor(
   options: AttributePlacementOptions = {},
 ): Position {
   const { model } = document;
-  const entity = findEntity(model, ownerId);
-  const owner = entity ?? findRelationship(model, ownerId);
+  const owner = findElementRef(model, ownerId);
   if (!owner) {
     throw new ModelError(`Unknown attribute owner "${ownerId}".`);
   }
 
-  const ownerSize = shapeSizeFor(shapeKindFor(entity ? 'entity' : 'relationship'), owner.name);
+  // A composite attribute owns its parts, so an owner may itself be an ellipse.
+  const ownerSize = shapeSizeFor(shapeKindFor(owner.kind), owner.name);
   const newSize = shapeSizeFor('ellipse', attributeName);
   const existing = attributesOf(model, ownerId).map((attribute) => ({
     offset: document.layout.positions[attribute.id] ?? { x: 0, y: 0 },

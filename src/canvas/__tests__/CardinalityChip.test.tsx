@@ -15,7 +15,7 @@ const store = (): ReturnType<typeof useDocumentStore.getState> => useDocumentSto
 function seedRelationship(): string {
   const a = store().addEntityAt({ x: 0, y: 0 });
   const b = store().addEntityAt({ x: 400, y: 0 });
-  return store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+  return store().addRelationshipBetween([a, b], { x: 200, y: 0 });
 }
 
 function labelFor(relationshipId: string, value: Cardinality | null): CardinalityLabel {
@@ -23,7 +23,7 @@ function labelFor(relationshipId: string, value: Cardinality | null): Cardinalit
 }
 
 function endValue(relationshipId: string): Cardinality | null {
-  return findRelationship(store().document.model, relationshipId)?.ends[0].cardinality ?? null;
+  return findRelationship(store().document.model, relationshipId)?.ends[0]?.cardinality ?? null;
 }
 
 describe('CardinalityChip', () => {
@@ -73,7 +73,7 @@ describe('CardinalityChip', () => {
     render(<CardinalityChip label={labelFor(id, null)} />);
     await user.click(screen.getByRole('button'));
 
-    expect(findRelationship(store().document.model, id)?.ends[1].cardinality).toBeNull();
+    expect(findRelationship(store().document.model, id)?.ends[1]?.cardinality).toBeNull();
   });
 
   it('records one undo entry per click', async () => {

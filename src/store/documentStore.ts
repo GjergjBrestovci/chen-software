@@ -5,7 +5,7 @@ import { nextCardinality } from '../model/cardinality';
 import { createId } from '../model/ids';
 import * as operations from '../model/operations';
 import { findElementName, findRelationship } from '../model/queries';
-import type { Cardinality, EndIndex, ErDocument, Id, Position } from '../model/types';
+import type { Cardinality, ErDocument, Id, Position } from '../model/types';
 
 /**
  * The document is the single source of truth. React Flow's nodes and edges are
@@ -23,10 +23,10 @@ export interface DocumentStore {
 
   addEntityAt: (position: Position) => Id;
   addAttributeTo: (ownerId: Id) => Id;
-  addRelationshipBetween: (firstEntityId: Id, secondEntityId: Id, position: Position) => Id;
+  addRelationshipBetween: (entityIds: readonly Id[], position: Position) => Id;
   rename: (id: Id, name: string) => void;
-  setCardinality: (relationshipId: Id, endIndex: EndIndex, value: Cardinality | null) => void;
-  cycleCardinality: (relationshipId: Id, endIndex: EndIndex) => void;
+  setCardinality: (relationshipId: Id, endIndex: number, value: Cardinality | null) => void;
+  cycleCardinality: (relationshipId: Id, endIndex: number) => void;
   moveMany: (moves: readonly operations.ElementMove[]) => void;
   remove: (ids: readonly Id[]) => void;
   replaceDocument: (document: ErDocument) => void;
@@ -57,13 +57,13 @@ export const useDocumentStore = create<DocumentStore>()(
         return id;
       },
 
-      addRelationshipBetween: (firstEntityId, secondEntityId, position) => {
+      addRelationshipBetween: (entityIds, position) => {
         const id = createId();
         set({
           document: operations.addRelationship(get().document, {
             id,
             name: '',
-            entityIds: [firstEntityId, secondEntityId],
+            entityIds,
             position,
           }),
         });
@@ -94,15 +94,15 @@ export const useDocumentStore = create<DocumentStore>()(
 
       cycleCardinality: (relationshipId, endIndex) => {
         const document = get().document;
-        const relationship = findRelationship(document.model, relationshipId);
-        if (!relationship) {
+        const end = findRelationship(document.model, relationshipId)?.ends[endIndex];
+        if (!end) {
           return;
         }
         set({
           document: operations.setCardinality(document, {
             relationshipId,
             endIndex,
-            cardinality: nextCardinality(relationship.ends[endIndex].cardinality),
+            cardinality: nextCardinality(end.cardinality),
           }),
         });
       },

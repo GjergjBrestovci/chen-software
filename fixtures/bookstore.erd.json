@@ -1,23 +1,27 @@
 {
-  "version": 1,
+  "version": 2,
   "title": "Bookstore",
   "model": {
     "entities": [
       {
         "id": "ent_publisher",
-        "name": "PUBLISHER"
+        "name": "PUBLISHER",
+        "kind": "regular"
       },
       {
         "id": "ent_book",
-        "name": "BOOK"
+        "name": "BOOK",
+        "kind": "regular"
       },
       {
         "id": "ent_author",
-        "name": "AUTHOR"
+        "name": "AUTHOR",
+        "kind": "regular"
       },
       {
         "id": "ent_genre",
-        "name": "GENRE"
+        "name": "GENRE",
+        "kind": "regular"
       }
     ],
     "attributes": [
@@ -26,119 +30,156 @@
         "ownerId": "ent_publisher",
         "ownerKind": "entity",
         "name": "name",
-        "kind": "key"
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false
       },
       {
         "id": "attr_book_isbn",
         "ownerId": "ent_book",
         "ownerKind": "entity",
         "name": "isbn",
-        "kind": "key"
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false
       },
       {
         "id": "attr_book_title",
         "ownerId": "ent_book",
         "ownerKind": "entity",
         "name": "title",
-        "kind": "simple"
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
       },
       {
         "id": "attr_book_pages",
         "ownerId": "ent_book",
         "ownerKind": "entity",
         "name": "pages",
-        "kind": "simple"
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
       },
       {
         "id": "attr_book_price",
         "ownerId": "ent_book",
         "ownerKind": "entity",
         "name": "price",
-        "kind": "simple"
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
       },
       {
         "id": "attr_book_publication_date",
         "ownerId": "ent_book",
         "ownerKind": "entity",
         "name": "publication_date",
-        "kind": "simple"
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
       },
       {
         "id": "attr_book_language",
         "ownerId": "ent_book",
         "ownerKind": "entity",
         "name": "language",
-        "kind": "simple"
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
       },
       {
         "id": "attr_author_id",
         "ownerId": "ent_author",
         "ownerKind": "entity",
         "name": "author_id",
-        "kind": "key"
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false
       },
       {
         "id": "attr_author_name",
         "ownerId": "ent_author",
         "ownerKind": "entity",
         "name": "name",
-        "kind": "simple"
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
       },
       {
         "id": "attr_genre_type",
         "ownerId": "ent_genre",
         "ownerKind": "entity",
         "name": "type",
-        "kind": "key"
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false
       },
       {
         "id": "attr_genre_age_rating",
         "ownerId": "ent_genre",
         "ownerKind": "entity",
         "name": "age_rating",
-        "kind": "simple"
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false
       }
     ],
     "relationships": [
       {
         "id": "rel_published_by",
         "name": "published_by",
+        "kind": "regular",
         "ends": [
           {
             "entityId": "ent_publisher",
-            "cardinality": "1"
+            "cardinality": "1",
+            "participation": "partial",
+            "role": null
           },
           {
             "entityId": "ent_book",
-            "cardinality": "N"
+            "cardinality": "N",
+            "participation": "partial",
+            "role": null
           }
         ]
       },
       {
         "id": "rel_writes",
         "name": "writes",
+        "kind": "regular",
         "ends": [
           {
             "entityId": "ent_author",
-            "cardinality": "M"
+            "cardinality": "M",
+            "participation": "partial",
+            "role": null
           },
           {
             "entityId": "ent_book",
-            "cardinality": "N"
+            "cardinality": "N",
+            "participation": "partial",
+            "role": null
           }
         ]
       },
       {
         "id": "rel_belongs_to",
         "name": "belongs_to",
+        "kind": "regular",
         "ends": [
           {
             "entityId": "ent_genre",
-            "cardinality": "1"
+            "cardinality": "1",
+            "participation": "partial",
+            "role": null
           },
           {
             "entityId": "ent_book",
-            "cardinality": "N"
+            "cardinality": "N",
+            "participation": "partial",
+            "role": null
           }
         ]
       }
@@ -219,6 +260,14 @@
         "y": 100
       }
     }
+  },
+  "presentation": {
+    "theme": {
+      "entity": "#333333",
+      "relationship": "#333333",
+      "attribute": "#333333"
+    },
+    "colors": {}
   },
   "dismissedHints": []
 }

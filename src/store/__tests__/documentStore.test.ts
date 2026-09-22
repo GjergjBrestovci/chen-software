@@ -46,20 +46,20 @@ describe('documentStore', () => {
   it('creates a relationship with both cardinalities undecided', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
-    const id = store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    const id = store().addRelationshipBetween([a, b], { x: 200, y: 0 });
 
     expect(findRelationship(store().document.model, id)?.ends).toEqual([
-      { entityId: a, cardinality: null },
-      { entityId: b, cardinality: null },
+      { entityId: a, cardinality: null, participation: 'partial', role: null },
+      { entityId: b, cardinality: null, participation: 'partial', role: null },
     ]);
   });
 
   it('cycles a cardinality through 1, N, M', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
-    const id = store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    const id = store().addRelationshipBetween([a, b], { x: 200, y: 0 });
     const valueAt = (): string | null =>
-      findRelationship(store().document.model, id)?.ends[0].cardinality ?? null;
+      findRelationship(store().document.model, id)?.ends[0]?.cardinality ?? null;
 
     store().cycleCardinality(id, 0);
     expect(valueAt()).toBe('1');
@@ -74,10 +74,10 @@ describe('documentStore', () => {
   it('can clear a cardinality, which only the Inspector offers', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
-    const id = store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    const id = store().addRelationshipBetween([a, b], { x: 200, y: 0 });
     store().setCardinality(id, 1, 'M');
     store().setCardinality(id, 1, null);
-    expect(findRelationship(store().document.model, id)?.ends[1].cardinality).toBeNull();
+    expect(findRelationship(store().document.model, id)?.ends[1]?.cardinality).toBeNull();
   });
 
   it('ignores cycling on a relationship that is gone', () => {
@@ -95,7 +95,7 @@ describe('documentStore', () => {
   it('cascades a delete through relationships and attributes', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
-    store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    store().addRelationshipBetween([a, b], { x: 200, y: 0 });
     store().addAttributeTo(a);
 
     store().remove([a]);
@@ -146,7 +146,7 @@ describe('documentStore undo history', () => {
   it('records one entry for a cascading delete', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
-    store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    store().addRelationshipBetween([a, b], { x: 200, y: 0 });
     store().addAttributeTo(a);
     const before = pastLength();
 
@@ -158,7 +158,7 @@ describe('documentStore undo history', () => {
   it('restores the whole cascade on undo', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
-    store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    store().addRelationshipBetween([a, b], { x: 200, y: 0 });
     store().remove([a]);
 
     useDocumentStore.temporal.getState().undo();
@@ -275,7 +275,7 @@ describe('documentStore undo and redo', () => {
   it('records nothing when a cardinality is set to the value it already has', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
-    const id = store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    const id = store().addRelationshipBetween([a, b], { x: 200, y: 0 });
     store().setCardinality(id, 0, 'N');
     const before = pastLength();
 
@@ -287,7 +287,7 @@ describe('documentStore undo and redo', () => {
   it('keeps one entry per cardinality click', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
-    const id = store().addRelationshipBetween(a, b, { x: 200, y: 0 });
+    const id = store().addRelationshipBetween([a, b], { x: 200, y: 0 });
     const before = pastLength();
 
     store().cycleCardinality(id, 0);

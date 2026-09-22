@@ -1,50 +1,62 @@
 import { z } from 'zod';
 import { messages } from '../i18n/messages.en';
-import { allElementIds } from './queries';
+import { allElementIds, rootOwnerOf } from './queries';
 import type { ErDocument, Id } from './types';
 
 /**
  * File-format validation for `.erd.json` (SPEC.md §8).
  *
  * zod checks the shape; `checkIntegrity` checks the things a shape cannot
- * express (dangling references, duplicate ids). Per the project ruling:
+ * express (dangling references, duplicate ids, composite cycles). Per the
+ * project ruling:
  *
  * - semantic damage rejects the WHOLE file, never a partial load;
  * - a missing `layout.positions` entry is NOT damage. Layout cannot affect
- *   correctness (SPEC.md §1.3), so those ids are reported back and the import
- *   layer places them. Dropping the element instead would mean the app edits
- *   the student's model, which SPEC.md §1.1 forbids.
+ *   correctness, so those ids are reported back and the import layer places
+ *   them. Dropping the element instead would mean the app edits the student's
+ *   model, which SPEC.md §1 forbids.
+ *
+ * Self-relationships are valid from version 2 onwards.
  */
 
 const idSchema = z.string().min(1);
+
 // zod v4's `z.number()` already rejects NaN and Infinity.
 const positionSchema = z.strictObject({
   x: z.number(),
   y: z.number(),
 });
 
+const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, { error: 'expected a #rrggbb colour' });
+
 const entitySchema = z.strictObject({
   id: idSchema,
   name: z.string(),
+  kind: z.enum(['regular', 'weak']),
 });
 
 const attributeSchema = z.strictObject({
   id: idSchema,
   ownerId: idSchema,
-  ownerKind: z.enum(['entity', 'relationship']),
+  ownerKind: z.enum(['entity', 'relationship', 'attribute']),
   name: z.string(),
-  kind: z.enum(['simple', 'key']),
+  shape: z.enum(['simple', 'composite', 'multivalued', 'derived']),
+  identifier: z.enum(['none', 'key', 'partial']),
+  foreignKey: z.boolean(),
 });
 
 const relationshipEndSchema = z.strictObject({
   entityId: idSchema,
   cardinality: z.enum(['1', 'N', 'M']).nullable(),
+  participation: z.enum(['partial', 'total']),
+  role: z.string().nullable(),
 });
 
 const relationshipSchema = z.strictObject({
   id: idSchema,
   name: z.string(),
-  ends: z.tuple([relationshipEndSchema, relationshipEndSchema]),
+  kind: z.enum(['regular', 'identifying']),
+  ends: z.array(relationshipEndSchema).min(2),
 });
 
 const erModelSchema = z.strictObject({
@@ -57,18 +69,34 @@ const layoutSchema = z.strictObject({
   positions: z.record(z.string(), positionSchema),
 });
 
+const presentationSchema = z.strictObject({
+  theme: z.strictObject({
+    entity: colorSchema,
+    relationship: colorSchema,
+    attribute: colorSchema,
+  }),
+  colors: z.record(z.string(), colorSchema),
+});
+
 export const erDocumentSchema = z.strictObject({
-  version: z.literal(1),
+  version: z.literal(2),
   title: z.string(),
   model: erModelSchema,
   layout: layoutSchema,
+  presentation: presentationSchema,
   dismissedHints: z.array(z.string()),
 });
 
-/** The format version this build writes and reads without migration. */
-export const CURRENT_VERSION = 1;
+/** The format version this build writes, and reads without migration. */
+export const CURRENT_VERSION = 2;
 
 const versionProbeSchema = z.object({ version: z.number() });
+
+/** Version carried by a file, or `null` if it has none we can read. */
+export function versionOf(input: unknown): number | null {
+  const probe = versionProbeSchema.safeParse(input);
+  return probe.success ? probe.data.version : null;
+}
 
 /** Name to quote back to the student, since an element may legitimately be unnamed. */
 function describe(name: string): string {
@@ -93,17 +121,27 @@ function checkIntegrity(document: ErDocument): string | null {
   const relationshipIds = new Set(
     document.model.relationships.map((relationship) => relationship.id),
   );
+  const attributeIds = new Set(document.model.attributes.map((attribute) => attribute.id));
 
   for (const attribute of document.model.attributes) {
-    const ownerIsEntity = entityIds.has(attribute.ownerId);
-    const ownerIsRelationship = relationshipIds.has(attribute.ownerId);
+    const actualKind = entityIds.has(attribute.ownerId)
+      ? 'entity'
+      : relationshipIds.has(attribute.ownerId)
+        ? 'relationship'
+        : attributeIds.has(attribute.ownerId)
+          ? 'attribute'
+          : undefined;
 
-    if (!ownerIsEntity && !ownerIsRelationship) {
+    if (actualKind === undefined) {
       return messages.file.unknownAttributeOwner(describe(attribute.name));
     }
-    const actualKind = ownerIsEntity ? 'entity' : 'relationship';
     if (attribute.ownerKind !== actualKind) {
       return messages.file.attributeOwnerKindMismatch(describe(attribute.name));
+    }
+    // A composite that owns itself, directly or through a chain, would make the
+    // canvas and the exporter recurse forever.
+    if (actualKind === 'attribute' && rootOwnerOf(document.model, attribute.id) === undefined) {
+      return messages.file.attributeOwnerCycle(describe(attribute.name));
     }
   }
 
@@ -112,12 +150,6 @@ function checkIntegrity(document: ErDocument): string | null {
       if (!entityIds.has(end.entityId)) {
         return messages.file.unknownRelationshipEntity(describe(relationship.name));
       }
-    }
-    if (relationship.ends[0].entityId === relationship.ends[1].entityId) {
-      // Self-relationships are phase 2 (SPEC.md §2) and the canvas cannot draw
-      // them yet, so an MVP build refuses the file rather than loading something
-      // it would render incorrectly.
-      return messages.file.selfRelationshipUnsupported(describe(relationship.name));
     }
   }
 
@@ -139,12 +171,14 @@ export interface ParsedDocument {
 
 export type ParseOutcome = { ok: true; value: ParsedDocument } | { ok: false; message: string };
 
-/** Validates an already-parsed JSON value as an `ErDocument`. */
+/**
+ * Validates an already-parsed, already-migrated JSON value as an `ErDocument`.
+ * Older files go through `persistence/migrations.ts` first.
+ */
 export function parseErDocument(input: unknown): ParseOutcome {
-  const probe = versionProbeSchema.safeParse(input);
-  if (probe.success && probe.data.version !== CURRENT_VERSION) {
-    // Milestone 7 hooks `persistence/migrations.ts` in here.
-    return { ok: false, message: messages.file.unsupportedVersion(probe.data.version) };
+  const version = versionOf(input);
+  if (version !== null && version !== CURRENT_VERSION) {
+    return { ok: false, message: messages.file.unsupportedVersion(version) };
   }
 
   const shape = erDocumentSchema.safeParse(input);
@@ -162,15 +196,4 @@ export function parseErDocument(input: unknown): ParseOutcome {
     ok: true,
     value: { document, missingPositionIds: findMissingPositionIds(document) },
   };
-}
-
-/** Validates raw `.erd.json` text. */
-export function parseErDocumentJson(text: string): ParseOutcome {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return { ok: false, message: messages.file.notJson };
-  }
-  return parseErDocument(parsed);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { z } from 'zod';
-import { CURRENT_VERSION, parseErDocument, parseErDocumentJson } from '../schema';
+import { CURRENT_VERSION, parseErDocument } from '../schema';
 import type { erDocumentSchema } from '../schema';
 import { createEmptyDocument } from '../operations';
 import type { ErDocument } from '../types';
@@ -62,7 +62,7 @@ describe('parseErDocument', () => {
   });
 
   it('exposes the current version', () => {
-    expect(CURRENT_VERSION).toBe(1);
+    expect(CURRENT_VERSION).toBe(2);
   });
 });
 
@@ -78,9 +78,9 @@ describe('parseErDocument rejects malformed files', () => {
 
   it('rejects an unknown future version with a specific message', () => {
     const message = expectRejected(
-      corrupted((document) => Object.assign(document, { version: 2 })),
+      corrupted((document) => Object.assign(document, { version: 9 })),
     );
-    expect(message).toContain('2');
+    expect(message).toContain('9');
   });
 
   it('rejects a missing title', () => {
@@ -98,17 +98,32 @@ describe('parseErDocument rejects malformed files', () => {
   it('rejects an invalid cardinality', () => {
     expectRejected(
       corrupted((document) => {
-        Object.assign(at(document.model.relationships, 0).ends[0], { cardinality: 'Z' });
+        Object.assign(at(at(document.model.relationships, 0).ends, 0), { cardinality: 'Z' });
       }),
     );
   });
 
-  it('rejects a relationship that does not have exactly two ends', () => {
+  it('rejects a relationship with fewer than two ends', () => {
     expectRejected(
       corrupted((document) => {
         at(document.model.relationships, 0).ends.pop();
       }),
     );
+  });
+
+  it('accepts a ternary relationship', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        const relationship = at(document.model.relationships, 0);
+        relationship.ends.push({
+          entityId: at(document.model.entities, 2).id,
+          cardinality: '1',
+          participation: 'partial',
+          role: null,
+        });
+      }),
+    );
+    expect(outcome.ok).toBe(true);
   });
 
   it('rejects a non-finite position', () => {
@@ -148,22 +163,24 @@ describe('parseErDocument rejects malformed files', () => {
   it('rejects a relationship end pointing at a missing entity', () => {
     const message = expectRejected(
       corrupted((document) => {
-        at(document.model.relationships, 0).ends[1].entityId = 'ghost';
+        at(at(document.model.relationships, 0).ends, 1).entityId = 'ghost';
       }),
     );
     expect(message).toContain('published_by');
   });
 
-  it('rejects a self-relationship, which is phase 2', () => {
-    const message = expectRejected(
+  it('accepts a self-relationship, which version 2 supports', () => {
+    const outcome = parseErDocument(
       corrupted((document) => {
-        at(document.model.relationships, 0).ends[1].entityId = at(
-          document.model.relationships,
-          0,
-        ).ends[0].entityId;
+        const ends = at(document.model.relationships, 0).ends;
+        const first = ends[0];
+        const second = ends[1];
+        if (first && second) {
+          second.entityId = first.entityId;
+        }
       }),
     );
-    expect(message).toContain('published_by');
+    expect(outcome.ok).toBe(true);
   });
 
   it('names an unnamed element rather than quoting an empty string', () => {
@@ -174,6 +191,82 @@ describe('parseErDocument rejects malformed files', () => {
       }),
     );
     expect(message).not.toContain('""');
+  });
+});
+
+describe('parseErDocument checks colours and composites', () => {
+  it('accepts the university fixture, which uses every notation feature', () => {
+    const outcome = parseErDocument(JSON.parse(readFixture('university.erd.json')));
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.value.document.model.relationships.some((r) => r.ends.length === 3)).toBe(true);
+    expect(outcome.value.document.model.attributes.some((a) => a.shape === 'composite')).toBe(true);
+    expect(outcome.value.document.model.attributes.some((a) => a.foreignKey)).toBe(true);
+    expect(Object.keys(outcome.value.document.presentation.colors)).toHaveLength(2);
+  });
+
+  it('rejects a colour that is not #rrggbb', () => {
+    for (const bad of ['red', '#fff', '#12345g', '']) {
+      expectRejected(
+        corrupted((document) => {
+          document.presentation.colors['ent_book'] = bad;
+        }),
+      );
+    }
+  });
+
+  it('rejects a theme with a bad colour', () => {
+    expectRejected(
+      corrupted((document) => {
+        document.presentation.theme.entity = 'blue';
+      }),
+    );
+  });
+
+  it('rejects a missing presentation slice', () => {
+    expectRejected(
+      corrupted((document) => {
+        delete (document as Partial<ErDocument>).presentation;
+      }),
+    );
+  });
+
+  it('rejects an attribute that is part of itself', () => {
+    const message = expectRejected(
+      corrupted((document) => {
+        const attribute = at(document.model.attributes, 0);
+        attribute.ownerId = attribute.id;
+        attribute.ownerKind = 'attribute';
+      }),
+    );
+    expect(message).toContain('itself');
+  });
+
+  it('rejects a cycle between two composite attributes', () => {
+    expectRejected(
+      corrupted((document) => {
+        const first = at(document.model.attributes, 0);
+        const second = at(document.model.attributes, 1);
+        first.ownerId = second.id;
+        first.ownerKind = 'attribute';
+        second.ownerId = first.id;
+        second.ownerKind = 'attribute';
+      }),
+    );
+  });
+
+  it('accepts a legitimate composite chain', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        const parent = at(document.model.attributes, 0);
+        const child = at(document.model.attributes, 1);
+        parent.shape = 'composite';
+        child.ownerId = parent.id;
+        child.ownerKind = 'attribute';
+        child.identifier = 'none';
+      }),
+    );
+    expect(outcome.ok).toBe(true);
   });
 });
 
@@ -197,18 +290,18 @@ describe('parseErDocument checks relationship-owned attributes', () => {
     );
   });
 
-  it('keeps a key attribute imported onto a relationship so the validator can flag it', () => {
+  it('keeps a key attribute imported onto a relationship so the checks can flag it', () => {
     const outcome = parseErDocument(
       corrupted((document) => {
         const attribute = at(document.model.attributes, 0);
         attribute.ownerId = at(document.model.relationships, 0).id;
         attribute.ownerKind = 'relationship';
-        attribute.kind = 'key';
+        attribute.identifier = 'key';
       }),
     );
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.value.document.model.attributes.some((a) => a.kind === 'key')).toBe(true);
+    expect(outcome.value.document.model.attributes.some((a) => a.identifier === 'key')).toBe(true);
   });
 });
 
@@ -233,22 +326,5 @@ describe('parseErDocument tolerates missing layout positions', () => {
       }),
     );
     expect(outcome.ok).toBe(true);
-  });
-});
-
-describe('parseErDocumentJson', () => {
-  it('parses the fixture text', () => {
-    expect(parseErDocumentJson(readFixture('bookstore.erd.json')).ok).toBe(true);
-  });
-
-  it('reports unreadable JSON separately from an invalid diagram', () => {
-    const outcome = parseErDocumentJson('{ not json');
-    expect(outcome.ok).toBe(false);
-    if (outcome.ok) return;
-    expect(outcome.message).toContain('JSON');
-  });
-
-  it('rejects valid JSON that is not a diagram', () => {
-    expect(parseErDocumentJson('{"hello":"world"}').ok).toBe(false);
   });
 });
