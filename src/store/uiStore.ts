@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { StateStorage } from 'zustand/middleware';
-import type { Id } from '../model/types';
+import type { ErDocument, Id } from '../model/types';
 
 /**
  * Canvas state that is not part of the document: what is selected, what is
@@ -20,6 +20,13 @@ export interface ContextMenuState {
   y: number;
 }
 
+/** A question the student has to answer before something irreversible happens. */
+export interface Confirmation {
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+}
+
 export interface RelationshipMode {
   active: boolean;
   /** First entity picked, waiting for the second. */
@@ -33,6 +40,13 @@ export interface UiStore {
   snapToGrid: boolean;
   theme: Theme;
   contextMenu: ContextMenuState | null;
+  confirmation: Confirmation | null;
+  /**
+   * The document as it was when last written to a file. Compared by reference,
+   * which works because every model operation returns a new document and a
+   * no-op returns the same one. `null` means nothing has been exported yet.
+   */
+  exportedDocument: ErDocument | null;
   /** Transient message shown to the student, e.g. why an action did nothing. */
   notice: string | null;
 
@@ -46,6 +60,9 @@ export interface UiStore {
   toggleTheme: () => void;
   openContextMenu: (menu: ContextMenuState) => void;
   closeContextMenu: () => void;
+  ask: (confirmation: Confirmation) => void;
+  dismissConfirmation: () => void;
+  markExported: (document: ErDocument) => void;
   notify: (message: string) => void;
   dismissNotice: () => void;
 }
@@ -95,6 +112,8 @@ export const useUiStore = create<UiStore>()(
       snapToGrid: true,
       theme: preferredTheme(),
       contextMenu: null,
+      confirmation: null,
+      exportedDocument: null,
       notice: null,
 
       setSelectedIds: (ids) => {
@@ -130,6 +149,15 @@ export const useUiStore = create<UiStore>()(
       },
       closeContextMenu: () => {
         set({ contextMenu: null });
+      },
+      ask: (confirmation) => {
+        set({ confirmation });
+      },
+      dismissConfirmation: () => {
+        set({ confirmation: null });
+      },
+      markExported: (document) => {
+        set({ exportedDocument: document });
       },
       notify: (message) => {
         set({ notice: message });

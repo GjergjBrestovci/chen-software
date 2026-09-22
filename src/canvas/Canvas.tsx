@@ -17,6 +17,8 @@ import { GRID_SIZE } from '../layout/types';
 import type { Id, Position } from '../model/types';
 import { useDocumentStore } from '../store/documentStore';
 import { useUiStore } from '../store/uiStore';
+import { useAutosave, useRestoreAutosave } from '../store/useAutosave';
+import { useFileActions } from '../store/useFileActions';
 import { redo, undo, useCanRedo, useCanUndo } from '../store/useTemporal';
 import { Toolbar } from '../ui/Toolbar';
 import { AttributeNode } from './nodes/AttributeNode';
@@ -80,6 +82,12 @@ export function Canvas(): ReactElement {
 
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
+  const file = useFileActions();
+
+  // Restore first, then start saving, so the empty starting document never
+  // overwrites what is being restored.
+  const restored = useRestoreAutosave();
+  useAutosave(restored);
 
   // Undo can delete whatever is selected or being renamed out from under us.
   useUiReconciler(document);
@@ -251,12 +259,14 @@ export function Canvas(): ReactElement {
         onDeleteSelection: deleteSelection,
         onUndo: undo,
         onRedo: redo,
+        onSave: file.saveDiagram,
         onEscape,
       }),
       [
         addAttributeToSelection,
         createEntityAt,
         deleteSelection,
+        file.saveDiagram,
         onEscape,
         toggleRelationshipMode,
         viewportCenter,
@@ -312,6 +322,10 @@ export function Canvas(): ReactElement {
         <Controls showInteractive={false} />
         <Panel position="top-left">
           <Toolbar
+            onNewDiagram={file.newDiagram}
+            onOpenDiagram={file.openDiagram}
+            onSaveDiagram={file.saveDiagram}
+            hasUnsavedChanges={file.hasUnsavedChanges}
             onNewEntity={() => {
               createEntityAt(viewportCenter());
             }}

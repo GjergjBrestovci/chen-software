@@ -1,11 +1,6 @@
 import { useEffect } from 'react';
 
-/**
- * Keyboard shortcuts from SPEC.md §5.
- *
- * `Ctrl/Cmd+S` arrives in milestone 7 and is deliberately absent rather than
- * half-wired.
- */
+/** Keyboard shortcuts from SPEC.md §5. */
 export interface ShortcutHandlers {
   onNewEntity: () => void;
   onAddAttribute: () => void;
@@ -13,6 +8,7 @@ export interface ShortcutHandlers {
   onDeleteSelection: () => void;
   onUndo: () => void;
   onRedo: () => void;
+  onSave: () => void;
   onEscape: () => void;
 }
 
@@ -45,7 +41,11 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
 
       if (event.ctrlKey || event.metaKey) {
         const key = event.key.toLowerCase();
-        if (key === 'z' && !event.shiftKey) {
+        if (key === 's') {
+          // The browser would otherwise offer to save the page itself.
+          event.preventDefault();
+          handlers.onSave();
+        } else if (key === 'z' && !event.shiftKey) {
           event.preventDefault();
           handlers.onUndo();
         } else if ((key === 'z' && event.shiftKey) || key === 'y') {

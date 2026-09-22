@@ -8,7 +8,7 @@ import {
   createEmptyDocument,
 } from '../../model/operations';
 import type { ErDocument } from '../../model/types';
-import { attributeOffsetFor, findFreeOffset } from '../placement';
+import { attributeOffsetFor, findFreeOffset, placeMissingPositions } from '../placement';
 import type { AttributeSlotContext } from '../placement';
 
 const OWNER = { width: 120, height: 60 };
@@ -191,5 +191,124 @@ describe('attributeOffsetFor', () => {
       layout: { positions: {} },
     };
     expect(() => attributeOffsetFor(stripped, 'book', 'title')).not.toThrow();
+  });
+});
+
+describe('placeMissingPositions', () => {
+  function bookstore(): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'book', name: 'BOOK', position: { x: 100, y: 100 } });
+    document = addEntity(document, { id: 'author', name: 'AUTHOR', position: { x: 500, y: 300 } });
+    document = addRelationship(document, {
+      id: 'writes',
+      name: 'writes',
+      entityIds: ['author', 'book'],
+      position: { x: 300, y: 200 },
+    });
+    document = addAttribute(document, {
+      id: 'isbn',
+      ownerId: 'book',
+      name: 'isbn',
+      offset: { x: 0, y: 140 },
+    });
+    return document;
+  }
+
+  /** Removes positions, the way a hand-edited file might. */
+  function without(document: ErDocument, ids: string[]): ErDocument {
+    const dropped = new Set(ids);
+    return {
+      ...document,
+      layout: {
+        positions: Object.fromEntries(
+          Object.entries(document.layout.positions).filter(([id]) => !dropped.has(id)),
+        ),
+      },
+    };
+  }
+
+  it('does nothing when nothing is missing', () => {
+    const document = bookstore();
+    expect(placeMissingPositions(document, [])).toBe(document);
+  });
+
+  it('gives a missing entity a position', () => {
+    const stripped = without(bookstore(), ['book']);
+    const repaired = placeMissingPositions(stripped, ['book']);
+    expect(repaired.layout.positions['book']).toBeDefined();
+  });
+
+  it('places a missing entity below everything already positioned', () => {
+    const stripped = without(bookstore(), ['book']);
+    const repaired = placeMissingPositions(stripped, ['book']);
+    const placed = repaired.layout.positions['book'];
+    expect(placed?.y).toBeGreaterThan(300);
+  });
+
+  it('never moves an element that already had a position', () => {
+    const stripped = without(bookstore(), ['book']);
+    const repaired = placeMissingPositions(stripped, ['book']);
+    expect(repaired.layout.positions['author']).toEqual({ x: 500, y: 300 });
+    expect(repaired.layout.positions['writes']).toEqual({ x: 300, y: 200 });
+  });
+
+  it('spreads several missing elements out instead of stacking them', () => {
+    const stripped = without(bookstore(), ['book', 'author', 'writes']);
+    const repaired = placeMissingPositions(stripped, ['book', 'author', 'writes']);
+    const placed = ['book', 'author', 'writes'].map((id) =>
+      JSON.stringify(repaired.layout.positions[id]),
+    );
+    expect(new Set(placed).size).toBe(3);
+  });
+
+  it('places a missing attribute around its owner', () => {
+    const stripped = without(bookstore(), ['isbn']);
+    const repaired = placeMissingPositions(stripped, ['isbn']);
+    const offset = repaired.layout.positions['isbn'];
+    expect(Number.isFinite(offset?.x)).toBe(true);
+    expect(Number.isFinite(offset?.y)).toBe(true);
+  });
+
+  it('keeps two missing attributes on the same owner apart', () => {
+    let document = addAttribute(bookstore(), {
+      id: 'title',
+      ownerId: 'book',
+      name: 'title',
+      offset: { x: 0, y: 0 },
+    });
+    document = without(document, ['isbn', 'title']);
+
+    const repaired = placeMissingPositions(document, ['isbn', 'title']);
+    expect(repaired.layout.positions['isbn']).not.toEqual(repaired.layout.positions['title']);
+  });
+
+  it('places an attribute whose owner was also missing', () => {
+    const stripped = without(bookstore(), ['book', 'isbn']);
+    const repaired = placeMissingPositions(stripped, ['book', 'isbn']);
+    expect(repaired.layout.positions['book']).toBeDefined();
+    expect(repaired.layout.positions['isbn']).toBeDefined();
+  });
+
+  it('copes with a document that has no positions at all', () => {
+    const stripped = without(bookstore(), ['book', 'author', 'writes', 'isbn']);
+    const repaired = placeMissingPositions(stripped, ['book', 'author', 'writes', 'isbn']);
+    expect(Object.keys(repaired.layout.positions).sort()).toEqual([
+      'author',
+      'book',
+      'isbn',
+      'writes',
+    ]);
+  });
+
+  it('never touches the model, only the layout', () => {
+    const stripped = without(bookstore(), ['book']);
+    expect(placeMissingPositions(stripped, ['book']).model).toEqual(stripped.model);
+  });
+
+  it('is deterministic', () => {
+    const stripped = without(bookstore(), ['book', 'isbn']);
+    expect(placeMissingPositions(stripped, ['book', 'isbn'])).toEqual(
+      placeMissingPositions(stripped, ['book', 'isbn']),
+    );
   });
 });

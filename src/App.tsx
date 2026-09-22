@@ -3,6 +3,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import type { ReactElement } from 'react';
 import { Canvas } from './canvas/Canvas';
 import { ComponentMenu } from './ui/ComponentMenu';
+import { ConfirmDialog } from './ui/ConfirmDialog';
 import { Notice } from './ui/Notice';
 import { useUiStore } from './store/uiStore';
 
@@ -19,6 +20,7 @@ export function App(): ReactElement {
       <div className="chen-app">
         <Canvas />
         <ComponentMenu />
+        <ConfirmDialog />
         <Notice />
       </div>
     </ReactFlowProvider>

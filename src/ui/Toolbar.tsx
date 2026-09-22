@@ -8,6 +8,10 @@ import type { Theme } from '../store/uiStore';
  * rather than colour alone (SPEC.md §10).
  */
 export interface ToolbarProps {
+  onNewDiagram: () => void;
+  onOpenDiagram: () => void;
+  onSaveDiagram: () => void;
+  hasUnsavedChanges: boolean;
   onNewEntity: () => void;
   onAddAttribute: () => void;
   onToggleRelationshipMode: () => void;
@@ -34,6 +38,41 @@ export function Toolbar(props: ToolbarProps): ReactElement {
 
   return (
     <div className="chen-toolbar" role="toolbar" aria-label={messages.app.title}>
+      <button
+        type="button"
+        onClick={props.onNewDiagram}
+        title={messages.file.newDiagram}
+        aria-label={messages.file.newDiagram}
+      >
+        <span aria-hidden="true" className="chen-icon chen-icon--new" />
+        {messages.file.newDiagram}
+      </button>
+
+      <button
+        type="button"
+        onClick={props.onOpenDiagram}
+        title={messages.file.open}
+        aria-label={messages.file.open}
+      >
+        <span aria-hidden="true" className="chen-icon chen-icon--open" />
+        {messages.file.open}
+      </button>
+
+      <button
+        type="button"
+        onClick={props.onSaveDiagram}
+        title={withShortcut(messages.file.save, messages.file.saveShortcut)}
+        aria-label={withShortcut(messages.file.save, messages.file.saveShortcut)}
+      >
+        <span aria-hidden="true" className="chen-icon chen-icon--save" />
+        {messages.file.save}
+        {props.hasUnsavedChanges && (
+          <span className="chen-unsaved" aria-hidden="true" title={messages.file.save} />
+        )}
+      </button>
+
+      <span className="chen-toolbar-separator" aria-hidden="true" />
+
       <button
         type="button"
         onClick={props.onNewEntity}

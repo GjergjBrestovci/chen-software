@@ -16,8 +16,16 @@ export const messages = {
     untitled: 'Untitled diagram',
   },
 
-  /** Messages shown when opening an `.erd.json` file (SPEC.md §8). */
+  /** Opening and saving `.erd.json` files (SPEC.md §8, §9). */
   file: {
+    newDiagram: 'New diagram',
+    open: 'Open',
+    save: 'Save',
+    saveShortcut: 'Ctrl+S',
+    discardChanges:
+      'This diagram has changes you have not saved to a file. Start a new one anyway?',
+    discardConfirm: 'Discard and start new',
+    opened: (title: string): string => `Opened ${title}.`,
     notJson: 'This file could not be read as JSON. Is it really an .erd.json diagram?',
     invalid: 'This file is not a valid ChenLab diagram, so nothing was loaded.',
     unsupportedVersion: (version: number): string =>
@@ -54,6 +62,11 @@ export const messages = {
     pickFirstEntity: 'Pick the first entity.',
     pickSecondEntity: 'Now pick the second entity.',
     attributeNeedsOwner: 'Select one entity or relationship first, then press A.',
+  },
+
+  dialog: {
+    cancel: 'Cancel',
+    label: 'Confirm',
   },
 
   menu: {

@@ -134,3 +134,72 @@ export function attributeOffsetFor(
 
   return findFreeOffset({ ownerSize, newSize, existing }, options);
 }
+
+/** Horizontal step between elements placed in the repair row. */
+const REPAIR_COLUMN = 220;
+/** Vertical step, and the gap below existing content. */
+const REPAIR_ROW = 160;
+/** Elements per repair row before wrapping. */
+const REPAIR_PER_ROW = 6;
+
+function isPositioned(document: ErDocument, id: Id, missing: ReadonlySet<Id>): boolean {
+  return !missing.has(id) && Object.hasOwn(document.layout.positions, id);
+}
+
+/**
+ * Gives a position to elements that arrived without one.
+ *
+ * An imported file with a missing `layout.positions` entry is not malformed:
+ * layout cannot affect correctness, so the element is placed rather than the
+ * whole file being rejected or the element being dropped, which would mean the
+ * app editing the student's model (SPEC.md §1, product rule 1).
+ *
+ * Entities and relationships go in a row below whatever is already positioned,
+ * so they never land on top of existing work. Attributes then use the ordinary
+ * free-spot search around their owner.
+ */
+export function placeMissingPositions(document: ErDocument, missingIds: readonly Id[]): ErDocument {
+  const missing = new Set(missingIds);
+  if (missing.size === 0) {
+    return document;
+  }
+
+  const positions = { ...document.layout.positions };
+  const { model } = document;
+
+  const placed = [...model.entities, ...model.relationships].filter((element) =>
+    isPositioned(document, element.id, missing),
+  );
+  const bottom = placed.reduce(
+    (lowest, element) => Math.max(lowest, positions[element.id]?.y ?? 0),
+    0,
+  );
+  const left = placed.reduce(
+    (leftmost, element) => Math.min(leftmost, positions[element.id]?.x ?? 0),
+    placed.length > 0 ? Number.POSITIVE_INFINITY : 0,
+  );
+
+  let index = 0;
+  for (const element of [...model.entities, ...model.relationships]) {
+    if (!missing.has(element.id)) {
+      continue;
+    }
+    positions[element.id] = {
+      x: left + (index % REPAIR_PER_ROW) * REPAIR_COLUMN,
+      y: bottom + REPAIR_ROW * (1 + Math.floor(index / REPAIR_PER_ROW)),
+    };
+    index += 1;
+  }
+
+  // Attributes last: the search reads its siblings' positions as it goes.
+  let repaired: ErDocument = { ...document, layout: { positions } };
+  for (const attribute of model.attributes) {
+    if (!missing.has(attribute.id)) {
+      continue;
+    }
+    positions[attribute.id] = attributeOffsetFor(repaired, attribute.ownerId, attribute.name);
+    repaired = { ...document, layout: { positions } };
+  }
+
+  return repaired;
+}
