@@ -15,6 +15,7 @@ const PURE_LAYERS = [
   'src/geometry/**',
   'src/layout/**',
   'src/persistence/**',
+  'src/export/**',
   'src/validation/**',
   'src/readback/**',
 ];

@@ -85,6 +85,9 @@ function sideNormal(direction: Point, side: LabelSide): Point {
   }
 }
 
+/** Font size of a cardinality label; the canvas stylesheet uses the same 13px. */
+export const CARDINALITY_FONT_SIZE = 13;
+
 /** Font size of a role name on a self-relationship end (SPEC.md §6). */
 export const ROLE_FONT_SIZE = 11;
 

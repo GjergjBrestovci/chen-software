@@ -87,5 +87,10 @@ export function parallelEdges(
  * would otherwise draw them all on top of each other, labels included.
  */
 export function spreadOffsets(count: number, gap: number = SPREAD_GAP): number[] {
-  return Array.from({ length: Math.max(0, count) }, (_, index) => (index - (count - 1) / 2) * gap);
+  return Array.from({ length: Math.max(0, count) }, (_, index) => spreadOffset(index, count, gap));
+}
+
+/** The offset of the `index`th of `count` spread lines; see `spreadOffsets`. */
+export function spreadOffset(index: number, count: number, gap: number = SPREAD_GAP): number {
+  return (index - (count - 1) / 2) * gap;
 }
