@@ -83,6 +83,7 @@ export function Canvas(): ReactElement {
   const toggleTheme = useUiStore((state) => state.toggleTheme);
   const openContextMenu = useUiStore((state) => state.openContextMenu);
   const closeContextMenu = useUiStore((state) => state.closeContextMenu);
+  const openExportDialog = useUiStore((state) => state.openExportDialog);
 
   const canUndo = useCanUndo();
   const canRedo = useCanRedo();
@@ -406,6 +407,7 @@ export function Canvas(): ReactElement {
             onNewDiagram={file.newDiagram}
             onOpenDiagram={file.openDiagram}
             onSaveDiagram={file.saveDiagram}
+            onExportPdf={openExportDialog}
             hasUnsavedChanges={file.hasUnsavedChanges}
             onNewEntity={() => {
               createEntityAt(viewportCenter());

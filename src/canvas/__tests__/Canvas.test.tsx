@@ -69,7 +69,7 @@ describe('Canvas interactions', () => {
     await user.keyboard('e');
 
     expect(model().entities).toHaveLength(1);
-    expect(await screen.findByRole('textbox')).toHaveFocus();
+    expect(await screen.findByRole('textbox', { name: 'Name' })).toHaveFocus();
   });
 
   it('puts a second entity beside the first instead of on top of it', async () => {

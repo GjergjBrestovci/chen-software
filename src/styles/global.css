@@ -14,6 +14,8 @@
   --chen-hover: #f2f4f7;
   --chen-grid: #e4e7ec;
   --chen-grid-strong: #d0d5dd;
+  /* Text on a filled accent or danger button: 5.2:1 and 6.6:1 on light. */
+  --chen-on-fill: #ffffff;
   --chen-shape-stroke-width: 1.5px;
 
   /* A component with no colour of its own falls back to the interface ink,
@@ -36,6 +38,9 @@
   --chen-hover: #2a2e36;
   --chen-grid: #232730;
   --chen-grid-strong: #2e333d;
+  /* The dark theme's accent and danger are light, so white on them is under
+     3:1. Near-black gives 7.0:1 and 6.4:1 (SPEC.md §10, WCAG AA). */
+  --chen-on-fill: #16181c;
 }
 
 * {
@@ -356,7 +361,8 @@ body {
 
 .chen-icon--new,
 .chen-icon--open,
-.chen-icon--save {
+.chen-icon--save,
+.chen-icon--pdf {
   border: none;
   height: auto;
   width: auto;
@@ -370,6 +376,12 @@ body {
 
 .chen-icon--open::before {
   content: '\1F5C1';
+  font-size: 13px;
+  line-height: 11px;
+}
+
+.chen-icon--pdf::before {
+  content: '\1F5B6';
   font-size: 13px;
   line-height: 11px;
 }
@@ -603,17 +615,108 @@ body {
   background: var(--chen-hover);
 }
 
-.chen-dialog-danger {
+/* Qualified by the container: `.chen-dialog-actions button` would otherwise
+   outrank a single class and paint these back to the surface colour. */
+.chen-dialog-actions .chen-dialog-danger {
   background: var(--chen-danger);
   border-color: var(--chen-danger);
-  color: #ffffff;
+  color: var(--chen-on-fill);
 }
 
-.chen-dialog-danger:hover {
+.chen-dialog-actions .chen-dialog-danger:hover {
   filter: brightness(1.1);
 }
 
 .chen-dialog-actions button:focus-visible {
   outline: 2px solid var(--chen-accent);
   outline-offset: 2px;
+}
+
+/* ---------- diagram title and PDF export ---------- */
+
+.chen-title-field {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--chen-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  max-width: 220px;
+  padding: 5px 8px;
+}
+
+.chen-title-field:hover {
+  border-color: var(--chen-border);
+}
+
+.chen-title-field:focus-visible {
+  border-color: var(--chen-accent);
+  outline: 2px solid var(--chen-accent-soft);
+}
+
+.chen-export-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 320px;
+}
+
+.chen-export-dialog h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.chen-field {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  gap: 4px;
+}
+
+.chen-field select,
+.chen-field input {
+  background: var(--chen-surface);
+  border: 1px solid var(--chen-border);
+  border-radius: 6px;
+  color: var(--chen-ink);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.chen-field input:disabled {
+  opacity: 0.5;
+}
+
+.chen-check {
+  align-items: flex-start;
+  display: flex;
+  font-size: 13px;
+  gap: 8px;
+}
+
+.chen-check small {
+  color: var(--chen-muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.chen-dialog-actions .chen-dialog-primary {
+  background: var(--chen-accent);
+  border-color: var(--chen-accent);
+  color: var(--chen-on-fill);
+}
+
+.chen-dialog-actions .chen-dialog-primary:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.chen-field select:focus-visible,
+.chen-field input:focus-visible,
+.chen-check input:focus-visible {
+  outline: 2px solid var(--chen-accent);
+  outline-offset: 1px;
 }

@@ -20,8 +20,9 @@ export const messages = {
   file: {
     newDiagram: 'New diagram',
     open: 'Open',
-    save: 'Save',
+    save: 'Save project',
     saveShortcut: 'Ctrl+S',
+    title: 'Diagram title',
     discardChanges:
       'This diagram has changes you have not saved to a file. Start a new one anyway?',
     discardConfirm: 'Discard and start new',
@@ -62,6 +63,26 @@ export const messages = {
     pickFirstEntity: 'Pick the first entity.',
     pickSecondEntity: 'Now pick the second entity.',
     attributeNeedsOwner: 'Select one entity or relationship first, then press A.',
+  },
+
+  pdf: {
+    export: 'Export PDF',
+    exporting: 'Exporting…',
+    dialogTitle: 'Export PDF',
+    pageSize: 'Page size',
+    a4: 'A4',
+    letter: 'Letter',
+    orientation: 'Orientation',
+    auto: 'Automatic',
+    portrait: 'Portrait',
+    landscape: 'Landscape',
+    includeHeader: 'Title at the top',
+    studentName: 'Your name',
+    studentNamePlaceholder: 'Optional',
+    standardNotation: 'Standard Chen notation only',
+    standardNotationHint:
+      'Leaves out the crown and plug markers, which some graders do not accept.',
+    failed: 'The PDF could not be created. Please try again.',
   },
 
   dialog: {

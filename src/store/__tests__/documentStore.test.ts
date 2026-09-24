@@ -297,6 +297,23 @@ describe('documentStore undo and redo', () => {
   });
 });
 
+describe('documentStore setTitle', () => {
+  beforeEach(() => {
+    reset();
+  });
+
+  it('renames the diagram as one undo step', () => {
+    store().setTitle('University');
+    expect(store().document.title).toBe('University');
+    expect(pastLength()).toBe(1);
+  });
+
+  it('records nothing when the title is unchanged', () => {
+    store().setTitle(store().document.title);
+    expect(pastLength()).toBe(0);
+  });
+});
+
 describe('loadDocument', () => {
   beforeEach(() => {
     setIdGenerator(sequentialIdGenerator('l'));

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { StateStorage } from 'zustand/middleware';
+import { DEFAULT_PDF_OPTIONS } from '../export/pdfOptions';
+import type { PdfOptions } from '../export/pdfOptions';
 import type { ErDocument, Id } from '../model/types';
 
 /**
@@ -47,6 +49,9 @@ export interface UiStore {
    * no-op returns the same one. `null` means nothing has been exported yet.
    */
   exportedDocument: ErDocument | null;
+  exportDialogOpen: boolean;
+  /** Remembered between exports, so a student types their name once. */
+  pdfOptions: PdfOptions;
   /** Transient message shown to the student, e.g. why an action did nothing. */
   notice: string | null;
 
@@ -63,6 +68,9 @@ export interface UiStore {
   ask: (confirmation: Confirmation) => void;
   dismissConfirmation: () => void;
   markExported: (document: ErDocument) => void;
+  openExportDialog: () => void;
+  closeExportDialog: () => void;
+  setPdfOptions: (changes: Partial<PdfOptions>) => void;
   notify: (message: string) => void;
   dismissNotice: () => void;
 }
@@ -114,6 +122,8 @@ export const useUiStore = create<UiStore>()(
       contextMenu: null,
       confirmation: null,
       exportedDocument: null,
+      exportDialogOpen: false,
+      pdfOptions: DEFAULT_PDF_OPTIONS,
       notice: null,
 
       setSelectedIds: (ids) => {
@@ -159,6 +169,15 @@ export const useUiStore = create<UiStore>()(
       markExported: (document) => {
         set({ exportedDocument: document });
       },
+      openExportDialog: () => {
+        set({ exportDialogOpen: true });
+      },
+      closeExportDialog: () => {
+        set({ exportDialogOpen: false });
+      },
+      setPdfOptions: (changes) => {
+        set((state) => ({ pdfOptions: { ...state.pdfOptions, ...changes } }));
+      },
       notify: (message) => {
         set({ notice: message });
       },
@@ -172,7 +191,11 @@ export const useUiStore = create<UiStore>()(
       // Only preferences survive a reload; everything else is per-session.
       // The theme is a per-viewer preference, never part of the document, so a
       // shared diagram renders correctly for whoever opens it (SPEC.md §4).
-      partialize: (state) => ({ snapToGrid: state.snapToGrid, theme: state.theme }),
+      partialize: (state) => ({
+        snapToGrid: state.snapToGrid,
+        theme: state.theme,
+        pdfOptions: state.pdfOptions,
+      }),
     },
   ),
 );

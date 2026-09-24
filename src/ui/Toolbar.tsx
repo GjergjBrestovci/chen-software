@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { messages } from '../i18n/messages.en';
 import type { Theme } from '../store/uiStore';
+import { TitleField } from './TitleField';
 
 /**
  * Every button carries a label and a tooltip naming its shortcut, and the
@@ -11,6 +12,7 @@ export interface ToolbarProps {
   onNewDiagram: () => void;
   onOpenDiagram: () => void;
   onSaveDiagram: () => void;
+  onExportPdf: () => void;
   hasUnsavedChanges: boolean;
   onNewEntity: () => void;
   onAddAttribute: () => void;
@@ -38,6 +40,8 @@ export function Toolbar(props: ToolbarProps): ReactElement {
 
   return (
     <div className="chen-toolbar" role="toolbar" aria-label={messages.app.title}>
+      <TitleField />
+
       <button
         type="button"
         onClick={props.onNewDiagram}
@@ -69,6 +73,16 @@ export function Toolbar(props: ToolbarProps): ReactElement {
         {props.hasUnsavedChanges && (
           <span className="chen-unsaved" aria-hidden="true" title={messages.file.save} />
         )}
+      </button>
+
+      <button
+        type="button"
+        onClick={props.onExportPdf}
+        title={messages.pdf.export}
+        aria-label={messages.pdf.export}
+      >
+        <span aria-hidden="true" className="chen-icon chen-icon--pdf" />
+        {messages.pdf.export}
       </button>
 
       <span className="chen-toolbar-separator" aria-hidden="true" />

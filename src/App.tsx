@@ -4,6 +4,7 @@ import type { ReactElement } from 'react';
 import { Canvas } from './canvas/Canvas';
 import { ComponentMenu } from './ui/ComponentMenu';
 import { ConfirmDialog } from './ui/ConfirmDialog';
+import { ExportDialog } from './ui/ExportDialog';
 import { Notice } from './ui/Notice';
 import { useUiStore } from './store/uiStore';
 
@@ -21,6 +22,7 @@ export function App(): ReactElement {
         <Canvas />
         <ComponentMenu />
         <ConfirmDialog />
+        <ExportDialog />
         <Notice />
       </div>
     </ReactFlowProvider>

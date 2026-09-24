@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_PDF_OPTIONS } from '../../export/pdfOptions';
 import { useUiStore } from '../uiStore';
 
 const store = (): ReturnType<typeof useUiStore.getState> => useUiStore.getState();
@@ -96,5 +97,32 @@ describe('uiStore theme and context menu', () => {
     store().openContextMenu({ elementId: 'book', x: 10, y: 20 });
     store().openContextMenu({ elementId: 'author', x: 30, y: 40 });
     expect(store().contextMenu?.elementId).toBe('author');
+  });
+});
+
+describe('uiStore PDF export', () => {
+  beforeEach(() => {
+    useUiStore.setState({ exportDialogOpen: false, pdfOptions: DEFAULT_PDF_OPTIONS });
+  });
+
+  it('opens and closes the export dialog', () => {
+    store().openExportDialog();
+    expect(store().exportDialogOpen).toBe(true);
+    store().closeExportDialog();
+    expect(store().exportDialogOpen).toBe(false);
+  });
+
+  it('starts from the default options', () => {
+    expect(store().pdfOptions).toEqual(DEFAULT_PDF_OPTIONS);
+  });
+
+  it('changes one option without disturbing the others', () => {
+    store().setPdfOptions({ studentName: 'Ada' });
+    store().setPdfOptions({ pageSize: 'letter' });
+    expect(store().pdfOptions).toEqual({
+      ...DEFAULT_PDF_OPTIONS,
+      studentName: 'Ada',
+      pageSize: 'letter',
+    });
   });
 });

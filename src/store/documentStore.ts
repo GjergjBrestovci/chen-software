@@ -47,6 +47,7 @@ export interface DocumentStore {
   setComponentTheme: (theme: ComponentTheme) => void;
   moveMany: (moves: readonly operations.ElementMove[]) => void;
   remove: (ids: readonly Id[]) => void;
+  setTitle: (title: string) => void;
   replaceDocument: (document: ErDocument) => void;
 }
 
@@ -162,6 +163,14 @@ export const useDocumentStore = create<DocumentStore>()(
 
       remove: (ids) => {
         set({ document: operations.deleteElements(get().document, ids) });
+      },
+
+      setTitle: (title) => {
+        const document = get().document;
+        if (document.title === title) {
+          return;
+        }
+        set({ document: operations.setTitle(document, title) });
       },
 
       replaceDocument: (document) => {
