@@ -15,13 +15,13 @@ export const FILE_EXTENSION = '.erd.json';
 export const FILE_MIME_TYPE = 'application/json';
 
 /** A filename derived from the diagram title, safe on every platform. */
-export function fileNameFor(title: string): string {
+export function fileNameFor(title: string, extension: string = FILE_EXTENSION): string {
   const cleaned = title
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return `${cleaned.length > 0 ? cleaned : 'diagram'}${FILE_EXTENSION}`;
+  return `${cleaned.length > 0 ? cleaned : 'diagram'}${extension}`;
 }
 
 /** The exact bytes written to disk. Pure, so a test can assert them. */

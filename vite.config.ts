@@ -14,6 +14,11 @@ export default defineConfig({
     // `// @vitest-environment jsdom` docblock from milestone 3 onwards.
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
+    // Node resolves svg2pdf.js through `main`, its UMD build, which expects a
+    // global jsPDF. The browser build already takes the ES build through
+    // `module`; the tests are pointed at the same one.
+    alias: [{ find: /^svg2pdf\.js$/, replacement: 'svg2pdf.js/dist/svg2pdf.es.min.js' }],
+    server: { deps: { inline: ['svg2pdf.js'] } },
     coverage: {
       provider: 'v8',
       include: [
