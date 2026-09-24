@@ -12,6 +12,18 @@ import type { Point, ShapeBox, Size } from './types';
 /** Default marker footprint, in pixels. */
 export const MARKER_SIZE: Size = { width: 14, height: 11 };
 
+/**
+ * Marker artwork, in a `MARKER_SIZE` box with its origin at the top left.
+ * Shared by the canvas and the PDF so the two cannot draw different shapes.
+ */
+export const CROWN_PATH = 'M1 9 L1 2.5 L4 5.5 L7 1.5 L10 5.5 L13 2.5 L13 9 Z';
+
+/** A plug on a lead: two prongs and the trailing cable, stroked. */
+export const PLUG_STROKE_PATH = 'M4.6 0.8 L4.6 3.4 M9.4 0.8 L9.4 3.4 M7 7.6 L7 10.4';
+
+/** The body of the plug, filled. */
+export const PLUG_BODY = { x: 2.6, y: 3.4, width: 8.8, height: 4.2, radius: 1.3 } as const;
+
 /** Gap between two markers, and between the markers and the shape. */
 const MARKER_GAP = 4;
 

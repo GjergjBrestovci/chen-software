@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactElement } from 'react';
-import { markerSlots, MARKER_SIZE } from '../../geometry';
+import { CROWN_PATH, markerSlots, MARKER_SIZE, PLUG_BODY, PLUG_STROKE_PATH } from '../../geometry';
 import type { ShapeBox } from '../../geometry';
 import { messages } from '../../i18n/messages.en';
 
@@ -22,7 +22,7 @@ export interface AttributeMarkersProps {
 function Crown(): ReactElement {
   return (
     <svg viewBox="0 0 14 11" aria-hidden="true">
-      <path className="chen-marker-fill" d="M1 9 L1 2.5 L4 5.5 L7 1.5 L10 5.5 L13 2.5 L13 9 Z" />
+      <path className="chen-marker-fill" d={CROWN_PATH} />
     </svg>
   );
 }
@@ -31,9 +31,15 @@ function Crown(): ReactElement {
 function Cable(): ReactElement {
   return (
     <svg viewBox="0 0 14 11" aria-hidden="true">
-      <path className="chen-marker-stroke" d="M4.6 0.8 L4.6 3.4 M9.4 0.8 L9.4 3.4" />
-      <rect className="chen-marker-fill" x="2.6" y="3.4" width="8.8" height="4.2" rx="1.3" />
-      <path className="chen-marker-stroke" d="M7 7.6 L7 10.4" />
+      <rect
+        className="chen-marker-fill"
+        x={PLUG_BODY.x}
+        y={PLUG_BODY.y}
+        width={PLUG_BODY.width}
+        height={PLUG_BODY.height}
+        rx={PLUG_BODY.radius}
+      />
+      <path className="chen-marker-stroke" d={PLUG_STROKE_PATH} />
     </svg>
   );
 }
