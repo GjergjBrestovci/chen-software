@@ -5,7 +5,7 @@ import type { ErDocument } from '../model/types';
 import { fileNameFor } from '../persistence/fileIO';
 import { describeDiagram } from './drawing';
 import { layoutPage, PAGE_MARGIN } from './pageLayout';
-import type { Orientation, PageSize } from './pageLayout';
+import type { PdfOptions } from './pdfOptions';
 import { renderSvg } from './renderSvg';
 
 /**
@@ -16,23 +16,8 @@ import { renderSvg } from './renderSvg';
 
 export const PDF_EXTENSION = '.pdf';
 
-export interface PdfOptions {
-  pageSize: PageSize;
-  orientation: Orientation;
-  /** Leave out the crown and plug, which are not Chen notation. */
-  standardNotation: boolean;
-  /** Put the diagram title, and the student's name if given, at the top. */
-  includeHeader: boolean;
-  studentName: string;
-}
-
-export const DEFAULT_PDF_OPTIONS: PdfOptions = {
-  pageSize: 'a4',
-  orientation: 'auto',
-  standardNotation: false,
-  includeHeader: true,
-  studentName: '',
-};
+export type { PdfOptions } from './pdfOptions';
+export { DEFAULT_PDF_OPTIONS } from './pdfOptions';
 
 const TITLE_SIZE = 16;
 const NAME_SIZE = 11;
@@ -70,6 +55,15 @@ export async function buildPdf(document: ErDocument, options: PdfOptions): Promi
   });
   pdf.setProperties({ title, author: studentName, creator: messages.app.title });
 
+  // The diagram goes on first. svg2pdf.js remembers which font it last set and
+  // skips setting it again, so a bold title drawn beforehand would leave jsPDF on
+  // bold and every name in the diagram would come out bold too. An empty
+  // diagram still gets its header, just nothing below it.
+  if (rendered.width > 0) {
+    const svg = new DOMParser().parseFromString(rendered.svg, 'image/svg+xml').documentElement;
+    await svg2pdf(svg, pdf, layout.diagram);
+  }
+
   if (options.includeHeader) {
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(TITLE_SIZE);
@@ -82,12 +76,6 @@ export async function buildPdf(document: ErDocument, options: PdfOptions): Promi
         baseline: 'top',
       });
     }
-  }
-
-  // An empty diagram still gets its header, just nothing below it.
-  if (rendered.width > 0) {
-    const svg = new DOMParser().parseFromString(rendered.svg, 'image/svg+xml').documentElement;
-    await svg2pdf(svg, pdf, layout.diagram);
   }
 
   return pdf;

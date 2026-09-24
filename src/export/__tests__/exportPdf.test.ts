@@ -40,6 +40,24 @@ async function pdfText(document: ErDocument, options: Partial<PdfOptions> = {}):
   return pdf.output();
 }
 
+/**
+ * The standard font a piece of text is actually set in. jsPDF registers all 14
+ * standard fonts in every file, so the font list says nothing; this follows the
+ * PDF's own references from the text, to the font it selected, to its name.
+ */
+function fontOf(raw: string, text: string): string {
+  const show = raw.indexOf(`(${text}) Tj`);
+  if (show < 0) throw new Error(`"${text}" is not shown as text`);
+  const selections = [...raw.slice(0, show).matchAll(/\/(F\d+) [\d.]+ Tf/g)];
+  const key = selections.at(-1)?.[1];
+  if (!key) throw new Error(`no font selected before "${text}"`);
+  const object = new RegExp(`/${key} (\\d+) 0 R`).exec(raw)?.[1];
+  if (!object) throw new Error(`no resource for ${key}`);
+  const name = new RegExp(`\\b${object} 0 obj[\\s\\S]*?/BaseFont /([\\w-]+)`).exec(raw)?.[1];
+  if (!name) throw new Error(`no base font for object ${object}`);
+  return name;
+}
+
 describe('buildPdf', () => {
   it('produces a PDF', async () => {
     expect((await pdfText(university())).startsWith('%PDF-')).toBe(true);
@@ -51,6 +69,21 @@ describe('buildPdf', () => {
     for (const name of ['COURSE', 'STUDENT', 'supervises', 'supervisor']) {
       expect(raw).toMatch(new RegExp(`\\(${name}\\) Tj`));
     }
+  });
+
+  it('sets the diagram in Helvetica, the font its text was measured for', async () => {
+    // svg2pdf.js looks font names up case-sensitively and silently falls back to
+    // Times, which would also leave every underline and centred name misaligned.
+    const raw = await pdfText(university());
+    expect(fontOf(raw, 'COURSE')).toBe('Helvetica');
+    expect(fontOf(raw, 'supervisor')).toBe('Helvetica-Oblique');
+  });
+
+  it('sets cardinalities in bold Helvetica', async () => {
+    const raw = await pdfText(university());
+    const cardinality = /\((1|N|M)\) Tj/.exec(raw)?.[1];
+    if (!cardinality) throw new Error('no cardinality shown');
+    expect(fontOf(raw, cardinality)).toBe('Helvetica-Bold');
   });
 
   it('embeds no images, so every line is vector and stays sharp at any zoom', async () => {

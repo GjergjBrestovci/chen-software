@@ -59,9 +59,10 @@ describe('renderSvg', () => {
     expect(all).toHaveLength(drawing.shapes.length + drawing.labels.length);
   });
 
-  it('sets every piece of text in Helvetica, the font jsPDF has built in', () => {
+  it('names Helvetica in the lower case svg2pdf.js can match', () => {
+    // exportPdf.test.ts checks the font the PDF actually uses.
     for (const node of root.querySelectorAll('text')) {
-      expect(node.getAttribute('font-family')).toBe('Helvetica');
+      expect(node.getAttribute('font-family')).toBe('helvetica');
     }
   });
 

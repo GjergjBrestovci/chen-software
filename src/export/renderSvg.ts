@@ -24,7 +24,13 @@ import type { Drawing, DrawnLabel, DrawnShape } from './drawing';
 const INK = '#1a1a1a';
 const ROLE_INK = '#344054';
 const PAPER = '#ffffff';
-const FONT_FAMILY = 'Helvetica';
+/**
+ * Lower case on purpose. svg2pdf.js matches font names against jsPDF's font
+ * list, whose keys are lower case, before lowercasing; "Helvetica" misses and
+ * it silently falls back to Times, misaligning every centred name and underline
+ * measured for Helvetica. CSS font names ignore case, so browsers do not mind.
+ */
+const FONT_FAMILY = 'helvetica';
 const STROKE_WIDTH = 1.5;
 /** Dash pattern for a derived attribute's outline. */
 export const OUTLINE_DASH = '5 3';
