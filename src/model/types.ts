@@ -23,6 +23,48 @@ export type RelationshipKind = 'regular' | 'identifying';
 /** Discriminator for "what sort of thing is this id?" lookups. */
 export type ElementKind = 'entity' | 'relationship' | 'attribute';
 
+/** MySQL column types a student can choose for an attribute (SQL export only). */
+export type SqlType =
+  | 'INT'
+  | 'BIGINT'
+  | 'SMALLINT'
+  | 'TINYINT'
+  | 'DECIMAL'
+  | 'DOUBLE'
+  | 'BOOLEAN'
+  | 'CHAR'
+  | 'VARCHAR'
+  | 'TEXT'
+  | 'DATE'
+  | 'TIME'
+  | 'DATETIME'
+  | 'TIMESTAMP';
+
+/**
+ * How an attribute becomes a table column in the SQL export. Relational, not
+ * ER: nothing here is drawn on the canvas or in the PDF, and the checks never
+ * read it. Fields that do not apply to the chosen type are kept but ignored,
+ * so switching the type back and forth loses nothing.
+ */
+export interface ColumnSpec {
+  /** `null` means the student has not chosen one; the export falls back. */
+  type: SqlType | null;
+  /** CHAR and VARCHAR. */
+  length: number | null;
+  /** DECIMAL(precision, scale). */
+  precision: number | null;
+  scale: number | null;
+  /** Keys are NOT NULL whatever this says. */
+  notNull: boolean;
+  unique: boolean;
+  /** Only honoured on a single-column integer primary key. */
+  autoIncrement: boolean;
+  /** The default as typed; the export quotes or validates it by type. */
+  defaultValue: string | null;
+  /** The entity a foreign-key attribute points at. Used when `foreignKey` is on. */
+  references: Id | null;
+}
+
 /** Hex colour, e.g. `#2563eb`. Validated by the schema. */
 export type Color = string;
 
@@ -50,6 +92,8 @@ export interface Attribute {
    * primary key and a foreign key at once. Drawn as a cable marker.
    */
   foreignKey: boolean;
+  /** Column details for the SQL export. Invisible on the diagram. */
+  column: ColumnSpec;
 }
 
 export interface RelationshipEnd {
@@ -116,7 +160,7 @@ export interface Presentation {
 }
 
 export interface ErDocument {
-  version: 2;
+  version: 3;
   title: string;
   model: ErModel;
   layout: Layout;

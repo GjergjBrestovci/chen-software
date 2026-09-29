@@ -192,7 +192,7 @@ describe('useFileActions', () => {
     });
 
     await waitFor(() => {
-      expect(store().document.version).toBe(2);
+      expect(store().document.version).toBe(3);
     });
   });
 

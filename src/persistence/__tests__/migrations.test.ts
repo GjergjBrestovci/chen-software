@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { migrateToCurrent, readDocument, readDocumentJson } from '../migrations';
+import { createColumnSpec } from '../../model/column';
 import { createEmptyDocument } from '../../model/operations';
 import { DEFAULT_THEME } from '../../model/presentation';
 import { CURRENT_VERSION } from '../../model/schema';
-import type { ErDocument } from '../../model/types';
+import type { Attribute, ErDocument } from '../../model/types';
 
 function fixture(name: string): string {
   return readFileSync(new URL(`../../../fixtures/${name}`, import.meta.url), 'utf8');
@@ -115,9 +116,13 @@ describe('version 1 to 2', () => {
     expect(readDocument(v1()).ok).toBe(true);
   });
 
-  it('matches the version 2 fixture it was upgraded from', () => {
+  it('matches the current fixture it was upgraded from, apart from column details', () => {
     const upgraded = migrated();
     const current = JSON.parse(fixture('bookstore.erd.json')) as ErDocument;
+    // Version 1 had no column details, so the upgrade leaves them all unchosen.
+    for (const attribute of current.model.attributes) {
+      attribute.column = createColumnSpec();
+    }
     expect(upgraded).toEqual(current);
   });
 
@@ -126,6 +131,59 @@ describe('version 1 to 2', () => {
     const snapshot = structuredClone(raw);
     migrateToCurrent(raw);
     expect(raw).toEqual(snapshot);
+  });
+});
+
+/** The bookstore fixture as version 2 wrote it: no `column` on any attribute. */
+function v2(): Record<string, unknown> {
+  const document = JSON.parse(fixture('bookstore.erd.json')) as ErDocument;
+  return {
+    ...document,
+    version: 2,
+    model: {
+      ...document.model,
+      attributes: document.model.attributes.map((attribute) => {
+        const withoutColumn: Partial<Attribute> = { ...attribute };
+        delete withoutColumn.column;
+        return withoutColumn;
+      }),
+    },
+  };
+}
+
+describe('version 2 to 3', () => {
+  it('gives every attribute column details with nothing chosen', () => {
+    const outcome = readDocument(v2());
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    const { document } = outcome.value;
+    expect(document.version).toBe(3);
+    expect(document.model.attributes).toHaveLength(11);
+    expect(document.model.attributes.every((a) => a.column.type === null)).toBe(true);
+    expect(document.model.attributes[0]?.column).toEqual(createColumnSpec());
+  });
+
+  it('changes nothing else', () => {
+    const before = v2() as unknown as ErDocument;
+    const outcome = readDocument(v2());
+    if (!outcome.ok) throw new Error(outcome.message);
+    const after = outcome.value.document;
+    expect(after.model.entities).toEqual(before.model.entities);
+    expect(after.model.relationships).toEqual(before.model.relationships);
+    expect(after.layout).toEqual(before.layout);
+    expect(after.presentation).toEqual(before.presentation);
+    expect(after.title).toBe(before.title);
+  });
+
+  it('rejects a damaged version 2 file before transforming it', () => {
+    const raw = v2();
+    raw['presentation'] = 'nope';
+    expect(migrateToCurrent(raw).ok).toBe(false);
+  });
+
+  it('rejects a version 2 file that already has column details, since v2 never wrote them', () => {
+    const raw = { ...(JSON.parse(fixture('bookstore.erd.json')) as object), version: 2 };
+    expect(migrateToCurrent(raw).ok).toBe(false);
   });
 });
 

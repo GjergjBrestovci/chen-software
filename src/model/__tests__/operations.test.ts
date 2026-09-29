@@ -61,7 +61,7 @@ function sample(): ErDocument {
 describe('createEmptyDocument', () => {
   it('starts at the current version with nothing in it', () => {
     const document = createEmptyDocument();
-    expect(document.version).toBe(2);
+    expect(document.version).toBe(3);
     expect(document.model).toEqual({ entities: [], attributes: [], relationships: [] });
     expect(document.layout.positions).toEqual({});
     expect(document.presentation.colors).toEqual({});

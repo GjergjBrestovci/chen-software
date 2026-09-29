@@ -50,7 +50,7 @@ describe('autosave', () => {
   it('migrates a document saved by an older version', async () => {
     await writeAutosave(fixture('bookstore-v1.erd.json') as ErDocument);
     const restored = await readAutosave();
-    expect(restored?.version).toBe(2);
+    expect(restored?.version).toBe(3);
     expect(restored?.model.entities).toHaveLength(4);
   });
 

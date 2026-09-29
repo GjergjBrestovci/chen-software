@@ -8,6 +8,7 @@ import {
   createEmptyDocument,
   deleteElements,
   removeRelationshipEnd,
+  setAttributeColumn,
   setAttributeForeignKey,
   setAttributeIdentifier,
   setAttributeShape,
@@ -19,6 +20,7 @@ import {
   setTheme,
   wouldCycle,
 } from '../operations';
+import { createColumnSpec } from '../column';
 import { colorFor, DEFAULT_THEME, hasColorOverride } from '../presentation';
 import { attributesOf, findAttribute, findEntity, findRelationship, rootOwnerOf } from '../queries';
 import type { ErDocument } from '../types';
@@ -148,6 +150,73 @@ describe('attribute shape, identifier and foreign key', () => {
   it('rejects unknown attributes', () => {
     expect(() => setAttributeShape(sample(), 'ghost', 'derived')).toThrow(ModelError);
     expect(() => setAttributeForeignKey(sample(), 'ghost', true)).toThrow(ModelError);
+  });
+});
+
+describe('column details', () => {
+  it('starts every new attribute with nothing chosen', () => {
+    expect(findAttribute(sample().model, 'first')?.column).toEqual(createColumnSpec());
+  });
+
+  it('changes several fields at once and leaves the rest alone', () => {
+    const document = setAttributeColumn(sample(), 'first', {
+      type: 'VARCHAR',
+      length: 50,
+      notNull: true,
+    });
+    expect(findAttribute(document.model, 'first')?.column).toEqual({
+      ...createColumnSpec(),
+      type: 'VARCHAR',
+      length: 50,
+      notNull: true,
+    });
+  });
+
+  it('points a foreign key at an entity, including its own', () => {
+    let document = setAttributeColumn(sample(), 'first', { references: 'course' });
+    expect(findAttribute(document.model, 'first')?.column.references).toBe('course');
+    document = setAttributeColumn(document, 'first', { references: 'dept' });
+    expect(findAttribute(document.model, 'first')?.column.references).toBe('dept');
+    document = setAttributeColumn(document, 'first', { references: null });
+    expect(findAttribute(document.model, 'first')?.column.references).toBeNull();
+  });
+
+  it('rejects a reference to something that is not an entity', () => {
+    expect(() => setAttributeColumn(sample(), 'first', { references: 'offers' })).toThrow(
+      ModelError,
+    );
+  });
+
+  it.each([
+    ['length', { length: 0 }],
+    ['length', { length: 2.5 }],
+    ['precision', { precision: 0 }],
+    ['scale', { scale: -1 }],
+  ])('rejects an impossible %s', (_field, changes) => {
+    expect(() => setAttributeColumn(sample(), 'first', changes)).toThrow(ModelError);
+  });
+
+  it('accepts a scale of zero and clearing a number', () => {
+    const document = setAttributeColumn(sample(), 'first', { scale: 0, length: null });
+    expect(findAttribute(document.model, 'first')?.column.scale).toBe(0);
+  });
+
+  it('rejects unknown attributes', () => {
+    expect(() => setAttributeColumn(sample(), 'ghost', { unique: true })).toThrow(ModelError);
+  });
+
+  it('clears a reference to a deleted entity but keeps the attribute', () => {
+    let document = setAttributeColumn(sample(), 'first', { references: 'course' });
+    document = deleteElements(document, ['course']);
+    const attribute = findAttribute(document.model, 'first');
+    expect(attribute).toBeDefined();
+    expect(attribute?.column.references).toBeNull();
+  });
+
+  it('leaves references to surviving entities alone on delete', () => {
+    let document = setAttributeColumn(sample(), 'first', { references: 'dept' });
+    document = deleteElements(document, ['course']);
+    expect(findAttribute(document.model, 'first')?.column.references).toBe('dept');
   });
 });
 

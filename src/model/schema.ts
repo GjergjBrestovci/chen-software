@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { messages } from '../i18n/messages.en';
+import { SQL_TYPES } from './column';
 import { allElementIds, rootOwnerOf } from './queries';
 import type { ErDocument, Id } from './types';
 
@@ -35,7 +36,22 @@ const entitySchema = z.strictObject({
   kind: z.enum(['regular', 'weak']),
 });
 
-const attributeSchema = z.strictObject({
+const positiveIntSchema = z.number().int().positive();
+
+const columnSchema = z.strictObject({
+  type: z.enum(SQL_TYPES).nullable(),
+  length: positiveIntSchema.nullable(),
+  precision: positiveIntSchema.nullable(),
+  scale: z.number().int().nonnegative().nullable(),
+  notNull: z.boolean(),
+  unique: z.boolean(),
+  autoIncrement: z.boolean(),
+  defaultValue: z.string().nullable(),
+  references: idSchema.nullable(),
+});
+
+/** Attribute as version 2 wrote it. Version 3 only adds `column`. */
+export const attributeV2Schema = z.strictObject({
   id: idSchema,
   ownerId: idSchema,
   ownerKind: z.enum(['entity', 'relationship', 'attribute']),
@@ -44,6 +60,8 @@ const attributeSchema = z.strictObject({
   identifier: z.enum(['none', 'key', 'partial']),
   foreignKey: z.boolean(),
 });
+
+const attributeSchema = attributeV2Schema.extend({ column: columnSchema });
 
 const relationshipEndSchema = z.strictObject({
   entityId: idSchema,
@@ -59,7 +77,7 @@ const relationshipSchema = z.strictObject({
   ends: z.array(relationshipEndSchema).min(2),
 });
 
-const erModelSchema = z.strictObject({
+export const erModelSchema = z.strictObject({
   entities: z.array(entitySchema),
   attributes: z.array(attributeSchema),
   relationships: z.array(relationshipSchema),
@@ -79,7 +97,7 @@ const presentationSchema = z.strictObject({
 });
 
 export const erDocumentSchema = z.strictObject({
-  version: z.literal(2),
+  version: z.literal(3),
   title: z.string(),
   model: erModelSchema,
   layout: layoutSchema,
@@ -88,7 +106,7 @@ export const erDocumentSchema = z.strictObject({
 });
 
 /** The format version this build writes, and reads without migration. */
-export const CURRENT_VERSION = 2;
+export const CURRENT_VERSION = 3;
 
 const versionProbeSchema = z.object({ version: z.number() });
 
@@ -142,6 +160,9 @@ function checkIntegrity(document: ErDocument): string | null {
     // canvas and the exporter recurse forever.
     if (actualKind === 'attribute' && rootOwnerOf(document.model, attribute.id) === undefined) {
       return messages.file.attributeOwnerCycle(describe(attribute.name));
+    }
+    if (attribute.column.references !== null && !entityIds.has(attribute.column.references)) {
+      return messages.file.unknownColumnReference(describe(attribute.name));
     }
   }
 

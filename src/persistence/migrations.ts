@@ -1,7 +1,15 @@
 import { z } from 'zod';
 import { messages } from '../i18n/messages.en';
 import { createPresentation } from '../model/presentation';
-import { CURRENT_VERSION, parseErDocument, versionOf } from '../model/schema';
+import { createColumnSpec } from '../model/column';
+import {
+  attributeV2Schema,
+  CURRENT_VERSION,
+  erDocumentSchema,
+  erModelSchema,
+  parseErDocument,
+  versionOf,
+} from '../model/schema';
 import type { ParseOutcome } from '../model/schema';
 import type { ErDocument } from '../model/types';
 
@@ -51,6 +59,14 @@ const erDocumentV1Schema = z.strictObject({
 
 type ErDocumentV1 = z.infer<typeof erDocumentV1Schema>;
 
+/** Version 2: everything version 3 has except the attributes' `column`. */
+const erDocumentV2Schema = erDocumentSchema.extend({
+  version: z.literal(2),
+  model: erModelSchema.extend({ attributes: z.array(attributeV2Schema) }),
+});
+
+type ErDocumentV2 = z.infer<typeof erDocumentV2Schema>;
+
 /**
  * Version 1 to 2.
  *
@@ -60,7 +76,7 @@ type ErDocumentV1 = z.infer<typeof erDocumentV1Schema>;
  * theme is the ink the app already drew in. A version 1 file therefore survives
  * the upgrade with no visible change.
  */
-function migrateV1ToV2(document: ErDocumentV1): ErDocument {
+function migrateV1ToV2(document: ErDocumentV1): ErDocumentV2 {
   return {
     version: 2,
     title: document.title,
@@ -93,6 +109,25 @@ function migrateV1ToV2(document: ErDocumentV1): ErDocument {
   };
 }
 
+/**
+ * Version 2 to 3. Every attribute gets column details with nothing chosen.
+ * They are invisible on the diagram, so the upgrade changes nothing a student
+ * can see; the SQL export falls back to its defaults until they fill them in.
+ */
+function migrateV2ToV3(document: ErDocumentV2): ErDocument {
+  return {
+    ...document,
+    version: 3,
+    model: {
+      ...document.model,
+      attributes: document.model.attributes.map((attribute) => ({
+        ...attribute,
+        column: createColumnSpec(),
+      })),
+    },
+  };
+}
+
 export type MigrationOutcome = { ok: true; value: unknown } | { ok: false; message: string };
 
 /** Brings any supported file version up to the current one. */
@@ -109,7 +144,15 @@ export function migrateToCurrent(input: unknown): MigrationOutcome {
     if (!parsed.success) {
       return { ok: false, message: messages.file.invalid };
     }
-    return { ok: true, value: migrateV1ToV2(parsed.data) };
+    return { ok: true, value: migrateV2ToV3(migrateV1ToV2(parsed.data)) };
+  }
+
+  if (version === 2) {
+    const parsed = erDocumentV2Schema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, message: messages.file.invalid };
+    }
+    return { ok: true, value: migrateV2ToV3(parsed.data) };
   }
 
   return { ok: false, message: messages.file.unsupportedVersion(version) };

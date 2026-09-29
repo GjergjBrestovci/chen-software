@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import { CURRENT_VERSION, parseErDocument } from '../schema';
 import type { erDocumentSchema } from '../schema';
 import { createEmptyDocument } from '../operations';
-import type { ErDocument } from '../types';
+import type { Attribute, ErDocument } from '../types';
 import { readFixture } from './readFixture';
 
 /** The zod schema and the hand-written types must not drift apart. */
@@ -62,7 +62,7 @@ describe('parseErDocument', () => {
   });
 
   it('exposes the current version', () => {
-    expect(CURRENT_VERSION).toBe(2);
+    expect(CURRENT_VERSION).toBe(3);
   });
 });
 
@@ -156,6 +156,46 @@ describe('parseErDocument rejects malformed files', () => {
     expectRejected(
       corrupted((document) => {
         at(document.model.attributes, 0).ownerKind = 'relationship';
+      }),
+    );
+  });
+
+  it('rejects a foreign key that references a missing entity', () => {
+    const message = expectRejected(
+      corrupted((document) => {
+        at(document.model.attributes, 0).column.references = 'ghost';
+      }),
+    );
+    expect(message).toContain('name');
+  });
+
+  it('accepts a foreign key that references an entity in the file', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        at(document.model.attributes, 0).column.references = 'ent_book';
+      }),
+    );
+    expect(outcome.ok).toBe(true);
+  });
+
+  it.each([
+    ['an unknown type', { type: 'VARCHAR2' }],
+    ['a zero length', { length: 0 }],
+    ['a fractional precision', { precision: 2.5 }],
+    ['a negative scale', { scale: -1 }],
+    ['a numeric default', { defaultValue: 5 }],
+  ])('rejects column details with %s', (_label, change) => {
+    expectRejected(
+      corrupted((document) => {
+        Object.assign(at(document.model.attributes, 0).column, change);
+      }),
+    );
+  });
+
+  it('rejects an attribute with no column details', () => {
+    expectRejected(
+      corrupted((document) => {
+        delete (at(document.model.attributes, 0) as Partial<Attribute>).column;
       }),
     );
   });

@@ -7,6 +7,7 @@ import {
   createEmptyDocument,
   setCardinality,
 } from '../../model/operations';
+import { createColumnSpec } from '../../model/column';
 import { readDocumentJson } from '../../persistence/migrations';
 import type { ErDocument } from '../../model/types';
 import { distance, shapeSizeFor } from '../../geometry';
@@ -330,6 +331,7 @@ describe('buildScene is defensive about references', () => {
             shape: 'simple',
             identifier: 'none',
             foreignKey: false,
+            column: createColumnSpec(),
           },
         ],
         relationships: [

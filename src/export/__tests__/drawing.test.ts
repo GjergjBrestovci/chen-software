@@ -11,6 +11,7 @@ import {
   setAttributeForeignKey,
   setElementColor,
 } from '../../model/operations';
+import { createColumnSpec } from '../../model/column';
 import { readDocumentJson } from '../../persistence/migrations';
 import type { ErDocument } from '../../model/types';
 
@@ -170,6 +171,7 @@ describe('describeDiagram edge cases', () => {
             shape: 'simple',
             identifier: 'none',
             foreignKey: false,
+            column: createColumnSpec(),
           },
         ],
         relationships: [

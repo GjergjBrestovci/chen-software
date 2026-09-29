@@ -1,5 +1,6 @@
 import { produce } from 'immer';
 import { messages } from '../i18n/messages.en';
+import { createColumnSpec } from './column';
 import { parseDismissalKey } from './dismissals';
 import { ModelError } from './errors';
 import { createPresentation } from './presentation';
@@ -15,6 +16,7 @@ import {
 } from './queries';
 import type {
   AttributeIdentifier,
+  ColumnSpec,
   AttributeShape,
   Cardinality,
   Color,
@@ -46,7 +48,7 @@ export const MIN_RELATIONSHIP_ENDS = 2;
 
 export function createEmptyDocument(title: string = messages.document.untitled): ErDocument {
   return {
-    version: 2,
+    version: 3,
     title,
     model: { entities: [], attributes: [], relationships: [] },
     layout: { positions: {} },
@@ -167,6 +169,7 @@ export function addAttribute(document: ErDocument, params: AddAttributeParams): 
       shape: params.shape ?? 'simple',
       identifier,
       foreignKey: params.foreignKey ?? false,
+      column: createColumnSpec(),
     });
     draft.layout.positions[params.id] = { ...params.offset };
   });
@@ -279,6 +282,44 @@ export function setAttributeForeignKey(
     const target = findAttribute(draft.model, id);
     if (target) {
       target.foreignKey = foreignKey;
+    }
+  });
+}
+
+function assertCount(value: number | null, minimum: number, field: string): void {
+  if (value !== null && (!Number.isInteger(value) || value < minimum)) {
+    throw new ModelError(`Column ${field} must be a whole number of at least ${String(minimum)}.`);
+  }
+}
+
+/**
+ * Changes an attribute's column details for the SQL export. One call is one
+ * undo entry, however many fields change, because the student applies the
+ * column form as a whole.
+ */
+export function setAttributeColumn(
+  document: ErDocument,
+  id: Id,
+  changes: Partial<ColumnSpec>,
+): ErDocument {
+  if (!findAttribute(document.model, id)) {
+    throw new ModelError(`Unknown attribute "${id}".`);
+  }
+  if (
+    changes.references !== undefined &&
+    changes.references !== null &&
+    !findEntity(document.model, changes.references)
+  ) {
+    throw new ModelError(`Unknown entity "${changes.references}".`);
+  }
+  assertCount(changes.length ?? null, 1, 'length');
+  assertCount(changes.precision ?? null, 1, 'precision');
+  assertCount(changes.scale ?? null, 0, 'scale');
+
+  return produce(document, (draft) => {
+    const target = findAttribute(draft.model, id);
+    if (target) {
+      Object.assign(target.column, changes);
     }
   });
 }
@@ -535,6 +576,14 @@ export function deleteElements(document: ErDocument, ids: readonly Id[]): ErDocu
     draft.presentation.colors = Object.fromEntries(
       Object.entries(draft.presentation.colors).filter(([id]) => !removed.has(id)),
     );
+
+    // A foreign key that pointed at a deleted entity loses its target, but the
+    // attribute itself is the student's and stays (SPEC.md §1, product rule 1).
+    for (const attribute of draft.model.attributes) {
+      if (attribute.column.references !== null && removed.has(attribute.column.references)) {
+        attribute.column.references = null;
+      }
+    }
 
     draft.dismissedHints = pruneDismissals(draft.dismissedHints, removed);
   });

@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "title": "University",
   "model": {
     "entities": [
@@ -37,7 +37,18 @@
         "name": "dept_id",
         "shape": "simple",
         "identifier": "key",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "INT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_dept_name",
@@ -46,7 +57,18 @@
         "name": "name",
         "shape": "simple",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 100,
+          "precision": null,
+          "scale": null,
+          "notNull": true,
+          "unique": true,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_course_code",
@@ -55,7 +77,18 @@
         "name": "code",
         "shape": "simple",
         "identifier": "partial",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 10,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_course_title",
@@ -64,7 +97,18 @@
         "name": "title",
         "shape": "simple",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 200,
+          "precision": null,
+          "scale": null,
+          "notNull": true,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_course_credits",
@@ -73,7 +117,18 @@
         "name": "credits",
         "shape": "simple",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "TINYINT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "5",
+          "references": null
+        }
       },
       {
         "id": "at_student_id",
@@ -82,7 +137,18 @@
         "name": "student_id",
         "shape": "simple",
         "identifier": "key",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "INT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_student_name",
@@ -91,7 +157,18 @@
         "name": "name",
         "shape": "composite",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": null,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_student_first",
@@ -100,7 +177,18 @@
         "name": "first",
         "shape": "simple",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 50,
+          "precision": null,
+          "scale": null,
+          "notNull": true,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_student_last",
@@ -109,7 +197,18 @@
         "name": "last",
         "shape": "simple",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 50,
+          "precision": null,
+          "scale": null,
+          "notNull": true,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_student_email",
@@ -118,7 +217,18 @@
         "name": "email",
         "shape": "multivalued",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 254,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_student_age",
@@ -127,7 +237,18 @@
         "name": "age",
         "shape": "derived",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "TINYINT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_student_dept",
@@ -136,7 +257,18 @@
         "name": "dept_id",
         "shape": "simple",
         "identifier": "none",
-        "foreignKey": true
+        "foreignKey": true,
+        "column": {
+          "type": "INT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": "ent_department"
+        }
       },
       {
         "id": "at_semester_term",
@@ -145,7 +277,18 @@
         "name": "term",
         "shape": "simple",
         "identifier": "key",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "CHAR",
+          "length": 6,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_employee_id",
@@ -154,7 +297,18 @@
         "name": "emp_id",
         "shape": "simple",
         "identifier": "key",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "INT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": null,
+          "references": null
+        }
       },
       {
         "id": "at_enrolls_grade",
@@ -163,7 +317,18 @@
         "name": "grade",
         "shape": "simple",
         "identifier": "none",
-        "foreignKey": false
+        "foreignKey": false,
+        "column": {
+          "type": "DECIMAL",
+          "length": null,
+          "precision": 2,
+          "scale": 1,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
       }
     ],
     "relationships": [
