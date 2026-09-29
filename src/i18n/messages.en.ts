@@ -87,6 +87,52 @@ export const messages = {
     failed: 'The PDF could not be created. Please try again.',
   },
 
+  /** The MySQL export: identifiers it has to invent, and the notes it writes. */
+  sql: {
+    unnamedTable: 'unnamed_table',
+    unnamedRelationshipLabel: 'An unnamed relationship',
+    unnamedColumn: 'unnamed_column',
+    generatedKey: 'id',
+    unnamedEntity: (name: string): string => `An unnamed entity was exported as ${name}.`,
+    unnamedRelationship: (name: string): string =>
+      `An unnamed relationship was exported as ${name}.`,
+    unnamedAttribute: (name: string): string => `An unnamed attribute was exported as ${name}.`,
+    duplicateTable: (wanted: string, name: string): string =>
+      `Two tables would be called ${wanted}, so one became ${name}.`,
+    missingCardinality: (relationship: string, entity: string): string =>
+      `${relationship} has no cardinality on the ${entity} end, so it was treated as many.`,
+    derivedLeftOut: (attribute: string, table: string): string =>
+      `${attribute} in ${table} is derived, so it has no column.`,
+    generatedPrimaryKey: (entity: string): string =>
+      `${entity} has no key attribute, so a generated id column is its primary key.`,
+    weakWithoutOwner: (entity: string): string =>
+      `${entity} is a weak entity but no identifying relationship connects it, so its key is only its own.`,
+    ownerCycle: (entity: string, owner: string): string =>
+      `${entity} and ${owner} identify each other, so ${entity} does not take ${owner}'s key.`,
+    foreignKeyWithoutTarget: (column: string): string =>
+      `${column} is marked as a foreign key but does not say which entity it references.`,
+    foreignKeyToCompositeKey: (column: string, table: string): string =>
+      `${column} references ${table}, whose primary key has several columns, so no foreign key constraint was added.`,
+    foreignKeyTypeMatched: (column: string, table: string): string =>
+      `${column} was given the type of ${table}'s key, because a foreign key must match the column it references.`,
+    autoIncrementIgnored: (column: string): string =>
+      `${column} asks for AUTO_INCREMENT, which MySQL allows only on a primary key that is one whole-number column, so it was left out.`,
+    missingTypes: (columns: string): string =>
+      `These columns have no type yet, so they were made VARCHAR(255): ${columns}.`,
+    missingLength: (column: string): string =>
+      `${column} is VARCHAR with no length, so it was given 255.`,
+    lengthClamped: (column: string, limit: number): string =>
+      `${column} is longer than MySQL allows, so it was shortened to ${String(limit)}.`,
+    decimalClamped: (column: string): string =>
+      `${column} has a DECIMAL precision or scale MySQL does not allow, so it was brought into range.`,
+    textInKey: (column: string): string =>
+      `${column} is TEXT, which MySQL cannot use in a key, so it was made VARCHAR(255).`,
+    invalidDefault: (column: string, type: string): string =>
+      `The default for ${column} is not a valid ${type} value, so it was left out.`,
+    header: (title: string): string => `${title}: MySQL tables exported from ChenLab.`,
+    notesHeading: 'Notes:',
+  },
+
   dialog: {
     cancel: 'Cancel',
     label: 'Confirm',

@@ -13,7 +13,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "verify:sql": "bash scripts/verify-sql.sh"
   },
   "dependencies": {
     "@xyflow/react": "^12.11.6",

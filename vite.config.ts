@@ -27,6 +27,7 @@ export default defineConfig({
         'src/layout/**/*.ts',
         'src/persistence/**/*.ts',
         'src/export/**/*.ts',
+        'src/relational/**/*.ts',
         'src/canvas/scene.ts',
         'src/canvas/nodeChanges.ts',
         'src/canvas/connections.ts',

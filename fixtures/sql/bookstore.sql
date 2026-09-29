@@ -1,0 +1,48 @@
+-- Bookstore: MySQL tables exported from ChenLab.
+
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `writes`;
+DROP TABLE IF EXISTS `BOOK`;
+DROP TABLE IF EXISTS `GENRE`;
+DROP TABLE IF EXISTS `AUTHOR`;
+DROP TABLE IF EXISTS `PUBLISHER`;
+SET FOREIGN_KEY_CHECKS = 1;
+
+CREATE TABLE `PUBLISHER` (
+  `name` VARCHAR(100) NOT NULL,
+  PRIMARY KEY (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `AUTHOR` (
+  `author_id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(100) NOT NULL,
+  PRIMARY KEY (`author_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `GENRE` (
+  `type` VARCHAR(50) NOT NULL,
+  `age_rating` TINYINT DEFAULT 0,
+  PRIMARY KEY (`type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `BOOK` (
+  `isbn` CHAR(13) NOT NULL,
+  `title` VARCHAR(200) NOT NULL,
+  `pages` SMALLINT,
+  `price` DECIMAL(8, 2) NOT NULL,
+  `publication_date` DATE,
+  `language` VARCHAR(40) DEFAULT 'English',
+  `name` VARCHAR(100),
+  `type` VARCHAR(50),
+  PRIMARY KEY (`isbn`),
+  FOREIGN KEY (`name`) REFERENCES `PUBLISHER` (`name`),
+  FOREIGN KEY (`type`) REFERENCES `GENRE` (`type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `writes` (
+  `author_id` INT NOT NULL,
+  `isbn` CHAR(13) NOT NULL,
+  PRIMARY KEY (`author_id`, `isbn`),
+  FOREIGN KEY (`author_id`) REFERENCES `AUTHOR` (`author_id`),
+  FOREIGN KEY (`isbn`) REFERENCES `BOOK` (`isbn`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

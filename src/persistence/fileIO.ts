@@ -94,18 +94,23 @@ export function pickDocumentFile(): Promise<File | null> {
   });
 }
 
-/** Hands the document to the browser as a download. */
-export function downloadDocument(document: ErDocument): void {
-  const blob = new Blob([serializeDocument(document)], { type: FILE_MIME_TYPE });
+/** Hands some text to the browser as a download. */
+export function downloadText(text: string, fileName: string, mimeType: string): void {
+  const blob = new Blob([text], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = globalThis.document.createElement('a');
 
   link.href = url;
-  link.download = fileNameFor(document.title);
+  link.download = fileName;
   link.rel = 'noopener';
   globalThis.document.body.append(link);
   link.click();
   link.remove();
 
   URL.revokeObjectURL(url);
+}
+
+/** Hands the document to the browser as a download. */
+export function downloadDocument(document: ErDocument): void {
+  downloadText(serializeDocument(document), fileNameFor(document.title), FILE_MIME_TYPE);
 }
