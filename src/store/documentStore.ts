@@ -10,6 +10,7 @@ import type {
   AttributeShape,
   Cardinality,
   Color,
+  ColumnSpec,
   ComponentTheme,
   EntityKind,
   ErDocument,
@@ -43,6 +44,7 @@ export interface DocumentStore {
   setAttributeShape: (id: Id, shape: AttributeShape) => void;
   setAttributeIdentifier: (id: Id, identifier: AttributeIdentifier) => void;
   setAttributeForeignKey: (id: Id, foreignKey: boolean) => void;
+  setAttributeColumn: (id: Id, changes: Partial<ColumnSpec>) => void;
   setElementColor: (id: Id, color: Color | null) => void;
   setComponentTheme: (theme: ComponentTheme) => void;
   moveMany: (moves: readonly operations.ElementMove[]) => void;
@@ -144,6 +146,10 @@ export const useDocumentStore = create<DocumentStore>()(
 
       setAttributeForeignKey: (id, foreignKey) => {
         set({ document: operations.setAttributeForeignKey(get().document, id, foreignKey) });
+      },
+
+      setAttributeColumn: (id, changes) => {
+        set({ document: operations.setAttributeColumn(get().document, id, changes) });
       },
 
       setElementColor: (id, color) => {

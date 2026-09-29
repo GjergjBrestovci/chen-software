@@ -362,7 +362,8 @@ body {
 .chen-icon--new,
 .chen-icon--open,
 .chen-icon--save,
-.chen-icon--pdf {
+.chen-icon--pdf,
+.chen-icon--sql {
   border: none;
   height: auto;
   width: auto;
@@ -383,6 +384,12 @@ body {
 .chen-icon--pdf::before {
   content: '\1F5B6';
   font-size: 13px;
+  line-height: 11px;
+}
+
+.chen-icon--sql::before {
+  content: '\2261';
+  font-size: 15px;
   line-height: 11px;
 }
 
@@ -717,6 +724,88 @@ body {
 .chen-field select:focus-visible,
 .chen-field input:focus-visible,
 .chen-check input:focus-visible {
+  outline: 2px solid var(--chen-accent);
+  outline-offset: 1px;
+}
+
+/* ---------- column details and SQL export ---------- */
+
+.chen-column-panel {
+  gap: 10px;
+  max-width: 300px;
+  padding: 12px 14px;
+  width: 300px;
+}
+
+.chen-column-panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chen-column-panel h2 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.chen-column-panel p {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.chen-column-panel .chen-panel-hint {
+  color: var(--chen-muted);
+  font-size: 12px;
+}
+
+.chen-panel-error {
+  color: var(--chen-danger);
+}
+
+.chen-field-row {
+  display: flex;
+  gap: 8px;
+}
+
+.chen-field-row .chen-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.chen-sql-dialog {
+  max-width: min(760px, calc(100vw - 32px));
+  width: 760px;
+}
+
+.chen-sql-notes h3 {
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+
+.chen-sql-notes ul {
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.chen-sql-preview {
+  background: var(--chen-paper);
+  border: 1px solid var(--chen-border);
+  border-radius: 6px;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  max-height: 50vh;
+  overflow: auto;
+  padding: 10px 12px;
+  user-select: text;
+  white-space: pre;
+}
+
+.chen-sql-preview:focus-visible {
   outline: 2px solid var(--chen-accent);
   outline-offset: 1px;
 }

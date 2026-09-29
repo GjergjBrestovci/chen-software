@@ -133,8 +133,23 @@ export const messages = {
     notesHeading: 'Notes:',
   },
 
+  /** The Export SQL dialog. */
+  sqlExport: {
+    export: 'Export SQL',
+    dialogTitle: 'Export SQL (MySQL)',
+    dropExisting: 'Start with DROP TABLE IF EXISTS',
+    dropExistingHint: 'So the script can be run again on a database that already has these tables.',
+    preview: 'SQL',
+    notes: 'How the diagram was read',
+    copy: 'Copy',
+    copied: 'The SQL was copied to the clipboard.',
+    copyFailed: 'The SQL could not be copied. Select it and copy it by hand.',
+    download: 'Download .sql',
+  },
+
   dialog: {
     cancel: 'Cancel',
+    close: 'Close',
     label: 'Confirm',
   },
 
@@ -161,8 +176,34 @@ export const messages = {
     partialKey: 'Partial key',
     relational: 'Relational',
     foreignKey: 'Foreign key',
+    columnDetails: 'Column details…',
     keysAreEntityOnly: 'Only an entity attribute can be a key.',
     compositeHasParts: 'Delete its parts before changing the shape.',
+  },
+
+  /** The column panel: details only the SQL export uses. */
+  column: {
+    label: 'Column details',
+    title: (attribute: string): string => `Column details for ${attribute}`,
+    hint: 'Only Export SQL uses these. Nothing here appears on the diagram or in the PDF.',
+    type: 'Type',
+    notSet: '— not set —',
+    length: 'Length',
+    precision: 'Precision',
+    scale: 'Scale',
+    notNull: 'NOT NULL',
+    keyIsNotNull: 'A key is always NOT NULL.',
+    unique: 'UNIQUE',
+    autoIncrement: 'AUTO_INCREMENT',
+    defaultValue: 'Default',
+    defaultPlaceholder: 'None',
+    references: 'References',
+    referencesHint: 'Mark it as a foreign key to choose which entity it references.',
+    derived: 'A derived attribute is worked out from others, so it has no column of its own.',
+    composite: 'A composite attribute is stored as its parts. Give each part its own details.',
+    wholeNumber: (field: string, minimum: number): string =>
+      `${field} must be a whole number of at least ${String(minimum)}.`,
+    apply: 'Apply',
   },
 
   marker: {

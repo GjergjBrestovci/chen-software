@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
+import { clampToViewport } from './viewport';
 
 /**
  * A menu anchored at a screen position.
@@ -14,15 +15,6 @@ export interface ContextMenuProps {
   label: string;
   onClose: () => void;
   children: ReactNode;
-}
-
-/** Keeps the menu inside the window when opened near an edge. */
-function clampToViewport(element: HTMLElement, x: number, y: number): void {
-  const { offsetWidth, offsetHeight } = element;
-  const maxX = globalThis.innerWidth - offsetWidth - 8;
-  const maxY = globalThis.innerHeight - offsetHeight - 8;
-  element.style.left = `${Math.max(8, Math.min(x, maxX))}px`;
-  element.style.top = `${Math.max(8, Math.min(y, maxY))}px`;
 }
 
 function focusableItems(root: HTMLElement): HTMLElement[] {

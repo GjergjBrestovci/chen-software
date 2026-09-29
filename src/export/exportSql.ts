@@ -4,6 +4,7 @@ import { downloadText, fileNameFor } from '../persistence/fileIO';
 import { mapModel } from '../relational/mapModel';
 import { renderMysql } from '../relational/mysql';
 import type { SqlExport } from '../relational/mysql';
+import type { SqlOptions } from './sqlOptions';
 
 /**
  * SQL export: the diagram's tables as MySQL DDL. The column details it relies
@@ -15,13 +16,8 @@ export const SQL_EXTENSION = '.sql';
 const SQL_MIME_TYPE = 'application/sql';
 
 export type { SqlExport } from '../relational/mysql';
-
-export interface SqlOptions {
-  /** Start with DROP TABLE IF EXISTS, so the script can be run again. */
-  dropExisting: boolean;
-}
-
-export const DEFAULT_SQL_OPTIONS: SqlOptions = { dropExisting: false };
+export type { SqlOptions } from './sqlOptions';
+export { DEFAULT_SQL_OPTIONS } from './sqlOptions';
 
 /** Builds the SQL without saving it, so the dialog can preview it. */
 export function buildSql(document: ErDocument, options: SqlOptions): SqlExport {

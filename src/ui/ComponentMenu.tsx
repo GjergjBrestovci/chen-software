@@ -85,6 +85,8 @@ function RelationshipSection({ document, elementId, close }: SectionProps): Reac
 }
 
 function AttributeSection({ document, elementId, close }: SectionProps): ReactElement | null {
+  const contextMenu = useUiStore((state) => state.contextMenu);
+  const openColumnPanel = useUiStore((state) => state.openColumnPanel);
   const setAttributeShape = useDocumentStore((state) => state.setAttributeShape);
   const setAttributeIdentifier = useDocumentStore((state) => state.setAttributeIdentifier);
   const setAttributeForeignKey = useDocumentStore((state) => state.setAttributeForeignKey);
@@ -144,6 +146,17 @@ function AttributeSection({ document, elementId, close }: SectionProps): ReactEl
           onSelect={() => {
             setAttributeForeignKey(elementId, !attribute.foreignKey);
             close();
+          }}
+        />
+        <MenuItem
+          label={messages.menu.columnDetails}
+          onSelect={() => {
+            // Opens where the menu was, so the student's eye does not have to move.
+            openColumnPanel({
+              elementId,
+              x: contextMenu?.x ?? 0,
+              y: contextMenu?.y ?? 0,
+            });
           }}
         />
       </MenuGroup>

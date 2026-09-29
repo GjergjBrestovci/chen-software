@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { StateStorage } from 'zustand/middleware';
+import { DEFAULT_SQL_OPTIONS } from '../export/sqlOptions';
+import type { SqlOptions } from '../export/sqlOptions';
 import { DEFAULT_PDF_OPTIONS } from '../export/pdfOptions';
 import type { PdfOptions } from '../export/pdfOptions';
 import type { ErDocument, Id } from '../model/types';
@@ -15,7 +17,10 @@ import type { ErDocument, Id } from '../model/types';
  */
 export type Theme = 'light' | 'dark';
 
-/** Which component the context menu is open on, and where it was opened. */
+/**
+ * Which component the context menu is open on, and where it was opened. The
+ * column panel opens in the same place, for the attribute it was chosen on.
+ */
 export interface ContextMenuState {
   elementId: Id;
   x: number;
@@ -42,6 +47,7 @@ export interface UiStore {
   snapToGrid: boolean;
   theme: Theme;
   contextMenu: ContextMenuState | null;
+  columnPanel: ContextMenuState | null;
   confirmation: Confirmation | null;
   /**
    * The document as it was when last written to a file. Compared by reference,
@@ -52,6 +58,8 @@ export interface UiStore {
   exportDialogOpen: boolean;
   /** Remembered between exports, so a student types their name once. */
   pdfOptions: PdfOptions;
+  sqlDialogOpen: boolean;
+  sqlOptions: SqlOptions;
   /** Transient message shown to the student, e.g. why an action did nothing. */
   notice: string | null;
 
@@ -65,12 +73,17 @@ export interface UiStore {
   toggleTheme: () => void;
   openContextMenu: (menu: ContextMenuState) => void;
   closeContextMenu: () => void;
+  openColumnPanel: (panel: ContextMenuState) => void;
+  closeColumnPanel: () => void;
   ask: (confirmation: Confirmation) => void;
   dismissConfirmation: () => void;
   markExported: (document: ErDocument) => void;
   openExportDialog: () => void;
   closeExportDialog: () => void;
   setPdfOptions: (changes: Partial<PdfOptions>) => void;
+  openSqlDialog: () => void;
+  closeSqlDialog: () => void;
+  setSqlOptions: (changes: Partial<SqlOptions>) => void;
   notify: (message: string) => void;
   dismissNotice: () => void;
 }
@@ -120,10 +133,13 @@ export const useUiStore = create<UiStore>()(
       snapToGrid: true,
       theme: preferredTheme(),
       contextMenu: null,
+      columnPanel: null,
       confirmation: null,
       exportedDocument: null,
       exportDialogOpen: false,
       pdfOptions: DEFAULT_PDF_OPTIONS,
+      sqlDialogOpen: false,
+      sqlOptions: DEFAULT_SQL_OPTIONS,
       notice: null,
 
       setSelectedIds: (ids) => {
@@ -160,6 +176,12 @@ export const useUiStore = create<UiStore>()(
       closeContextMenu: () => {
         set({ contextMenu: null });
       },
+      openColumnPanel: (panel) => {
+        set({ contextMenu: null, columnPanel: panel });
+      },
+      closeColumnPanel: () => {
+        set({ columnPanel: null });
+      },
       ask: (confirmation) => {
         set({ confirmation });
       },
@@ -178,6 +200,15 @@ export const useUiStore = create<UiStore>()(
       setPdfOptions: (changes) => {
         set((state) => ({ pdfOptions: { ...state.pdfOptions, ...changes } }));
       },
+      openSqlDialog: () => {
+        set({ sqlDialogOpen: true });
+      },
+      closeSqlDialog: () => {
+        set({ sqlDialogOpen: false });
+      },
+      setSqlOptions: (changes) => {
+        set((state) => ({ sqlOptions: { ...state.sqlOptions, ...changes } }));
+      },
       notify: (message) => {
         set({ notice: message });
       },
@@ -195,6 +226,7 @@ export const useUiStore = create<UiStore>()(
         snapToGrid: state.snapToGrid,
         theme: state.theme,
         pdfOptions: state.pdfOptions,
+        sqlOptions: state.sqlOptions,
       }),
     },
   ),

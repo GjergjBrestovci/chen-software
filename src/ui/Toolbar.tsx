@@ -13,6 +13,7 @@ export interface ToolbarProps {
   onOpenDiagram: () => void;
   onSaveDiagram: () => void;
   onExportPdf: () => void;
+  onExportSql: () => void;
   hasUnsavedChanges: boolean;
   onNewEntity: () => void;
   onAddAttribute: () => void;
@@ -83,6 +84,16 @@ export function Toolbar(props: ToolbarProps): ReactElement {
       >
         <span aria-hidden="true" className="chen-icon chen-icon--pdf" />
         {messages.pdf.export}
+      </button>
+
+      <button
+        type="button"
+        onClick={props.onExportSql}
+        title={messages.sqlExport.export}
+        aria-label={messages.sqlExport.export}
+      >
+        <span aria-hidden="true" className="chen-icon chen-icon--sql" />
+        {messages.sqlExport.export}
       </button>
 
       <span className="chen-toolbar-separator" aria-hidden="true" />
