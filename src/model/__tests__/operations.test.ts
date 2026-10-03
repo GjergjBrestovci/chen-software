@@ -4,6 +4,7 @@ import { dismissalKey } from '../dismissals';
 import { DEFAULT_THEME } from '../presentation';
 import {
   addAttribute,
+  addAttributePart,
   addEntity,
   addRelationship,
   createEmptyDocument,
@@ -237,6 +238,170 @@ describe('addAttribute', () => {
     expect(() =>
       addAttribute(sample(), { id: 'book', ownerId: 'book', name: 'a', offset: origin }),
     ).toThrow(ModelError);
+  });
+});
+
+describe('addAttributePart', () => {
+  it('creates a part and sets the owner shape to composite', () => {
+    let document = sample();
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'pub',
+      name: 'name',
+      offset: origin,
+    });
+
+    document = addAttributePart(document, {
+      id: 'first',
+      ownerId: 'name',
+      name: 'first',
+      offset: origin,
+    });
+
+    const owner = findAttribute(document.model, 'name');
+    const part = findAttribute(document.model, 'first');
+
+    expect(owner?.shape).toBe('composite');
+    expect(part?.ownerId).toBe('name');
+    expect(part?.ownerKind).toBe('attribute');
+  });
+
+  it('keeps composite shape when owner is already composite', () => {
+    let document = sample();
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'pub',
+      name: 'name',
+      offset: origin,
+    });
+    document = setAttributeShape(document, 'name', 'composite');
+
+    document = addAttributePart(document, {
+      id: 'first',
+      ownerId: 'name',
+      name: 'first',
+      offset: origin,
+    });
+
+    expect(findAttribute(document.model, 'name')?.shape).toBe('composite');
+  });
+
+  it('rejects an entity as owner', () => {
+    expect(() =>
+      addAttributePart(sample(), {
+        id: 'x',
+        ownerId: 'pub',
+        name: 'a',
+        offset: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('rejects a relationship as owner', () => {
+    expect(() =>
+      addAttributePart(sample(), {
+        id: 'x',
+        ownerId: 'rel',
+        name: 'a',
+        offset: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('rejects an unknown attribute as owner', () => {
+    expect(() =>
+      addAttributePart(sample(), {
+        id: 'x',
+        ownerId: 'ghost',
+        name: 'a',
+        offset: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('defaults the part to simple, non-identifying, non-foreign', () => {
+    let document = sample();
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'pub',
+      name: 'name',
+      offset: origin,
+    });
+
+    document = addAttributePart(document, {
+      id: 'first',
+      ownerId: 'name',
+      name: 'first',
+      offset: origin,
+    });
+
+    const part = findAttribute(document.model, 'first');
+    expect(part?.shape).toBe('simple');
+    expect(part?.identifier).toBe('none');
+    expect(part?.foreignKey).toBe(false);
+  });
+
+  it('stores the offset relative to the owner', () => {
+    let document = sample();
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'pub',
+      name: 'name',
+      offset: origin,
+    });
+
+    document = addAttributePart(document, {
+      id: 'first',
+      ownerId: 'name',
+      name: 'first',
+      offset: { x: 30, y: -40 },
+    });
+
+    expect(document.layout.positions['first']).toEqual({ x: 30, y: -40 });
+  });
+
+  it('does not mutate the input document', () => {
+    let document = sample();
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'pub',
+      name: 'name',
+      offset: origin,
+    });
+
+    const snapshot = structuredClone(document);
+    addAttributePart(document, {
+      id: 'first',
+      ownerId: 'name',
+      name: 'first',
+      offset: origin,
+    });
+
+    expect(document).toEqual(snapshot);
+  });
+
+  it('allows multiple parts on the same composite', () => {
+    let document = sample();
+    document = addAttribute(document, {
+      id: 'name',
+      ownerId: 'pub',
+      name: 'name',
+      offset: origin,
+    });
+    document = addAttributePart(document, {
+      id: 'first',
+      ownerId: 'name',
+      name: 'first',
+      offset: origin,
+    });
+    document = addAttributePart(document, {
+      id: 'last',
+      ownerId: 'name',
+      name: 'last',
+      offset: { x: 50, y: 0 },
+    });
+
+    expect(attributesOf(document.model, 'name')).toHaveLength(2);
   });
 });
 

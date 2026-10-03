@@ -9,6 +9,7 @@ import { Canvas } from '../Canvas';
 import { Notice } from '../../ui/Notice';
 import { createEmptyDocument } from '../../model/operations';
 import { resetIdGenerator, sequentialIdGenerator, setIdGenerator } from '../../model/ids';
+import { findAttribute } from '../../model/queries';
 import { useDocumentStore } from '../../store/documentStore';
 import { useUiStore } from '../../store/uiStore';
 
@@ -394,5 +395,70 @@ describe('Canvas interactions', () => {
 
     expect(useUiStore.getState().snapToGrid).toBe(false);
     expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before);
+  });
+
+  it('enables the Add Attribute button when an attribute is selected', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+    const entityId = model().entities[0]?.id ?? '';
+    select([entityId]);
+
+    await user.keyboard('a');
+    await user.keyboard('name{Enter}');
+    const attributeId = model().attributes[0]?.id ?? '';
+
+    select([attributeId]);
+
+    const addButton = screen.getByRole('button', { name: /add attribute/i });
+    expect(addButton).not.toBeDisabled();
+  });
+
+  it('creates a part and makes the attribute composite when pressing A on an attribute', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+    const entityId = model().entities[0]?.id ?? '';
+    select([entityId]);
+
+    await user.keyboard('a');
+    await user.keyboard('name{Enter}');
+    const attributeId = model().attributes[0]?.id ?? '';
+
+    const attributeBefore = findAttribute(model(), attributeId);
+    expect(attributeBefore?.shape).toBe('simple');
+
+    select([attributeId]);
+    await user.keyboard('a');
+    await user.keyboard('first{Enter}');
+
+    expect(model().attributes).toHaveLength(2);
+
+    const owner = findAttribute(model(), attributeId);
+    const part = model().attributes.find((a) => a.ownerId === attributeId);
+
+    expect(owner?.shape).toBe('composite');
+    expect(part?.ownerKind).toBe('attribute');
+  });
+
+  it('still adds an attribute normally when an entity is selected', async () => {
+    const user = userEvent.setup();
+    renderCanvas();
+
+    await user.keyboard('e');
+    await user.keyboard('BOOK{Enter}');
+    const entityId = model().entities[0]?.id ?? '';
+    select([entityId]);
+
+    await user.keyboard('a');
+    await user.keyboard('title{Enter}');
+
+    expect(model().attributes).toHaveLength(1);
+    expect(model().attributes[0]?.ownerId).toBe(entityId);
+    expect(model().attributes[0]?.ownerKind).toBe('entity');
   });
 });
