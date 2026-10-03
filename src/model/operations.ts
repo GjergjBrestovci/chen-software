@@ -175,6 +175,46 @@ export function addAttribute(document: ErDocument, params: AddAttributeParams): 
   });
 }
 
+/**
+ * Adds a part to an attribute, automatically making it composite if needed.
+ *
+ * Unlike `addAttribute`, this operation does not require the owner to already
+ * be composite — it will set the shape to composite as part of the same
+ * undoable action.
+ */
+export function addAttributePart(document: ErDocument, params: AddAttributeParams): ErDocument {
+  assertIdIsFree(document, params.id);
+
+  const ownerKind = findElementKind(document.model, params.ownerId);
+  if (ownerKind !== 'attribute') {
+    throw new ModelError(`Owner "${params.ownerId}" is not an attribute.`);
+  }
+
+  const owner = findAttribute(document.model, params.ownerId);
+  if (!owner) {
+    throw new ModelError(`Unknown attribute "${params.ownerId}".`);
+  }
+
+  return produce(document, (draft) => {
+    const target = findAttribute(draft.model, params.ownerId);
+    if (target && target.shape !== 'composite') {
+      target.shape = 'composite';
+    }
+
+    draft.model.attributes.push({
+      id: params.id,
+      ownerId: params.ownerId,
+      ownerKind: 'attribute',
+      name: params.name,
+      shape: params.shape ?? 'simple',
+      identifier: 'none',
+      foreignKey: params.foreignKey ?? false,
+      column: createColumnSpec(),
+    });
+    draft.layout.positions[params.id] = { ...params.offset };
+  });
+}
+
 export interface RenameElementParams {
   id: Id;
   /** May be empty; the checks flag that rather than the operation. */

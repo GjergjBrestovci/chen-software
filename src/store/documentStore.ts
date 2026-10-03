@@ -35,6 +35,7 @@ export interface DocumentStore {
 
   addEntityAt: (position: Position) => Id;
   addAttributeTo: (ownerId: Id) => Id;
+  addAttributePart: (ownerId: Id) => Id;
   addRelationshipBetween: (entityIds: readonly Id[], position: Position) => Id;
   rename: (id: Id, name: string) => void;
   setCardinality: (relationshipId: Id, endIndex: number, value: Cardinality | null) => void;
@@ -69,6 +70,20 @@ export const useDocumentStore = create<DocumentStore>()(
         const document = get().document;
         set({
           document: operations.addAttribute(document, {
+            id,
+            ownerId,
+            name: '',
+            offset: attributeOffsetFor(document, ownerId, ''),
+          }),
+        });
+        return id;
+      },
+
+      addAttributePart: (ownerId) => {
+        const id = createId();
+        const document = get().document;
+        set({
+          document: operations.addAttributePart(document, {
             id,
             ownerId,
             name: '',

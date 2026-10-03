@@ -63,6 +63,7 @@ export function Canvas(): ReactElement {
   const document = useDocumentStore((state) => state.document);
   const addEntityAt = useDocumentStore((state) => state.addEntityAt);
   const addAttributeTo = useDocumentStore((state) => state.addAttributeTo);
+  const addAttributePartTo = useDocumentStore((state) => state.addAttributePart);
   const addRelationshipBetween = useDocumentStore((state) => state.addRelationshipBetween);
   const moveMany = useDocumentStore((state) => state.moveMany);
   const remove = useDocumentStore((state) => state.remove);
@@ -303,12 +304,17 @@ export function Canvas(): ReactElement {
   const addAttributeToSelection = useCallback(() => {
     const [onlyId, ...rest] = selectedIds;
     const owner = onlyId === undefined ? undefined : nodeById(onlyId);
-    if (rest.length > 0 || !owner || owner.type === 'attribute') {
+    if (rest.length > 0 || !owner) {
       notify(messages.canvas.attributeNeedsOwner);
       return;
     }
-    startRenaming(addAttributeTo(owner.id));
-  }, [addAttributeTo, nodeById, notify, selectedIds, startRenaming]);
+
+    if (owner.type === 'attribute') {
+      startRenaming(addAttributePartTo(owner.id));
+    } else {
+      startRenaming(addAttributeTo(owner.id));
+    }
+  }, [addAttributeTo, addAttributePartTo, nodeById, notify, selectedIds, startRenaming]);
 
   const deleteSelection = useCallback(() => {
     if (selectedIds.length === 0) {
@@ -424,7 +430,7 @@ export function Canvas(): ReactElement {
             onRedo={redo}
             relationshipModeActive={relationshipMode.active}
             snapToGrid={snapToGrid}
-            canAddAttribute={selectedOwner !== undefined && selectedOwner.type !== 'attribute'}
+            canAddAttribute={selectedOwner !== undefined}
             canDelete={selectedIds.length > 0}
             canUndo={canUndo}
             canRedo={canRedo}
