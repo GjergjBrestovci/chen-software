@@ -65,6 +65,7 @@ export const messages = {
     pickFirstEntity: 'Pick the first entity.',
     pickSecondEntity: 'Now pick the second entity.',
     attributeNeedsOwner: 'Select one entity or relationship first, then press A.',
+    attributeNotComposite: 'Selected attribute is not a composite. Change its type first.',
   },
 
   pdf: {

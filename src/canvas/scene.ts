@@ -52,6 +52,8 @@ export type AttributeNodeData = {
   isPrimaryKey: boolean;
   /** Cable marker: a foreign key (relational, not ER). */
   isForeignKey: boolean;
+  /** No visual difference: a composite attribute */
+  isComposite: boolean;
 };
 
 export type AppNode =
@@ -223,6 +225,7 @@ export function buildScene(input: SceneInput): Scene {
           isPartialKey: attribute.identifier === 'partial',
           isPrimaryKey: attribute.identifier === 'key',
           isForeignKey: attribute.foreignKey,
+          isComposite: attribute.shape === 'composite'
         },
       });
 

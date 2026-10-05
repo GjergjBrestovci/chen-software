@@ -31,7 +31,7 @@ import { decideConnect, decideConnectEnd } from './connections';
 import type { ConnectionDecision } from './connections';
 import { readNodeChanges, toMoves } from './nodeChanges';
 import { buildScene, midpointBetween } from './scene';
-import type { AppNode } from './scene';
+import type { AppNode, AttributeNodeData } from './scene';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { useUiReconciler } from './useUiReconciler';
 
@@ -303,10 +303,18 @@ export function Canvas(): ReactElement {
   const addAttributeToSelection = useCallback(() => {
     const [onlyId, ...rest] = selectedIds;
     const owner = onlyId === undefined ? undefined : nodeById(onlyId);
-    if (rest.length > 0 || !owner || owner.type === 'attribute') {
+    if (rest.length > 0 || !owner) {
       notify(messages.canvas.attributeNeedsOwner);
       return;
     }
+
+    // add guard to prevent non-composite attribute from having attribute parts
+    const attributeData = owner.data as AttributeNodeData;
+    if (!attributeData.isComposite) {
+      notify(messages.canvas.attributeNotComposite);
+      return;
+    }
+
     startRenaming(addAttributeTo(owner.id));
   }, [addAttributeTo, nodeById, notify, selectedIds, startRenaming]);
 
@@ -424,7 +432,7 @@ export function Canvas(): ReactElement {
             onRedo={redo}
             relationshipModeActive={relationshipMode.active}
             snapToGrid={snapToGrid}
-            canAddAttribute={selectedOwner !== undefined && selectedOwner.type !== 'attribute'}
+            canAddAttribute={selectedOwner !== undefined}
             canDelete={selectedIds.length > 0}
             canUndo={canUndo}
             canRedo={canRedo}
