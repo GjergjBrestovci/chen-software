@@ -148,6 +148,60 @@ describe('Canvas interactions', () => {
     expect(model().attributes).toHaveLength(0);
   });
 
+  describe('attribute parts', () => {
+    /** An entity with one attribute, made composite or left simple. */
+    function attributeOnEntity(shape: 'simple' | 'composite'): string {
+      const store = useDocumentStore.getState();
+      let attributeId = '';
+      act(() => {
+        const entityId = store.addEntityAt({ x: 0, y: 0 });
+        attributeId = store.addAttributeTo(entityId);
+        store.setAttributeShape(attributeId, shape);
+      });
+      return attributeId;
+    }
+
+    it('adds a part to the selected composite attribute with A', async () => {
+      const user = userEvent.setup();
+      renderCanvas();
+      const compositeId = attributeOnEntity('composite');
+      select([compositeId]);
+
+      await user.keyboard('a');
+
+      expect(model().attributes).toHaveLength(2);
+      expect(model().attributes[1]?.ownerId).toBe(compositeId);
+    });
+
+    it('refuses a part on a simple attribute instead of making it composite', async () => {
+      const user = userEvent.setup();
+      renderCanvas();
+      const simpleId = attributeOnEntity('simple');
+      select([simpleId]);
+
+      await user.keyboard('a');
+
+      expect(await screen.findByRole('status')).toHaveTextContent(/make it composite first/i);
+      expect(model().attributes).toHaveLength(1);
+      expect(model().attributes[0]?.shape).toBe('simple');
+    });
+
+    it('enables Add attribute only for owners that can take one', () => {
+      renderCanvas();
+      const button = screen.getByRole('button', { name: /add attribute \(A\)/i });
+      const simpleId = attributeOnEntity('simple');
+      const compositeId = attributeOnEntity('composite');
+      const entityId = model().entities[0]?.id ?? '';
+
+      select([entityId]);
+      expect(button).toBeEnabled();
+      select([simpleId]);
+      expect(button).toBeDisabled();
+      select([compositeId]);
+      expect(button).toBeEnabled();
+    });
+  });
+
   it('refuses a self-relationship and keeps the first pick', async () => {
     const user = userEvent.setup();
     renderCanvas();

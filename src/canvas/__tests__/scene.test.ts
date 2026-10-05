@@ -129,6 +129,21 @@ describe('buildScene nodes', () => {
     expect(isbn.type === 'attribute' && isbn.data.isKey).toBe(true);
   });
 
+  it('flags composite attributes, which alone may own parts', () => {
+    const document = addAttribute(sample(), {
+      id: 'title',
+      ownerId: 'book',
+      name: 'title',
+      shape: 'composite',
+      offset: { x: 160, y: 140 },
+    });
+    const { nodes } = scene(document);
+    const title = nodeOf(nodes, 'title');
+    const isbn = nodeOf(nodes, 'isbn');
+    expect(title.type === 'attribute' && title.data.isComposite).toBe(true);
+    expect(isbn.type === 'attribute' && isbn.data.isComposite).toBe(false);
+  });
+
   it('carries selection through from the UI store', () => {
     const { nodes } = scene(sample(), { selectedIds: ['book'] });
     expect(nodeOf(nodes, 'book').selected).toBe(true);

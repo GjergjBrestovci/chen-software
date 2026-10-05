@@ -31,7 +31,7 @@ import { decideConnect, decideConnectEnd } from './connections';
 import type { ConnectionDecision } from './connections';
 import { readNodeChanges, toMoves } from './nodeChanges';
 import { buildScene, midpointBetween } from './scene';
-import type { AppNode, AttributeNodeData } from './scene';
+import type { AppNode } from './scene';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { useUiReconciler } from './useUiReconciler';
 
@@ -55,6 +55,15 @@ const GRID_COLORS = {
 
 /** New shapes are created unnamed and go straight into rename mode (SPEC.md §5). */
 const NEW_NAME = '';
+
+/**
+ * Whether A may hang a new attribute off `node`. A composite attribute owns its
+ * parts; any other attribute is refused rather than made composite for the
+ * student (SPEC.md §1, product rule 1).
+ */
+function canOwnAttribute(node: AppNode): boolean {
+  return node.type !== 'attribute' || node.data.isComposite;
+}
 
 export function Canvas(): ReactElement {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -307,14 +316,10 @@ export function Canvas(): ReactElement {
       notify(messages.canvas.attributeNeedsOwner);
       return;
     }
-
-    // add guard to prevent non-composite attribute from having attribute parts
-    const attributeData = owner.data as AttributeNodeData;
-    if (!attributeData.isComposite) {
+    if (!canOwnAttribute(owner)) {
       notify(messages.canvas.attributeNotComposite);
       return;
     }
-
     startRenaming(addAttributeTo(owner.id));
   }, [addAttributeTo, nodeById, notify, selectedIds, startRenaming]);
 
@@ -432,7 +437,7 @@ export function Canvas(): ReactElement {
             onRedo={redo}
             relationshipModeActive={relationshipMode.active}
             snapToGrid={snapToGrid}
-            canAddAttribute={selectedOwner !== undefined}
+            canAddAttribute={selectedOwner !== undefined && canOwnAttribute(selectedOwner)}
             canDelete={selectedIds.length > 0}
             canUndo={canUndo}
             canRedo={canRedo}
