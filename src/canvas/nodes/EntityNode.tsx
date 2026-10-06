@@ -19,7 +19,9 @@ const SIDES = [
 export function EntityNode({ id, data, selected }: EntityNodeProps): ReactElement {
   return (
     <div
-      className={selected ? 'chen-shape chen-entity is-selected' : 'chen-shape chen-entity'}
+      className={['chen-shape chen-entity', selected && 'is-selected', data.doubled && 'is-doubled']
+        .filter(Boolean)
+        .join(' ')}
       style={componentStyle(data.color)}
     >
       <AnchorHandle />

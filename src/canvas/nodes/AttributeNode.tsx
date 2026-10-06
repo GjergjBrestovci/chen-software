@@ -17,7 +17,14 @@ export function AttributeNode({
 }: AttributeNodeProps): ReactElement {
   return (
     <div
-      className={selected ? 'chen-shape chen-attribute is-selected' : 'chen-shape chen-attribute'}
+      className={[
+        'chen-shape chen-attribute',
+        selected && 'is-selected',
+        data.doubled && 'is-doubled',
+        data.dashed && 'is-dashed',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={componentStyle(data.color)}
     >
       <AttributeMarkers

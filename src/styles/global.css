@@ -113,6 +113,26 @@ body {
   vector-effect: non-scaling-stroke;
 }
 
+/* A derived attribute (SPEC.md §6). */
+.chen-attribute.is-dashed {
+  border-style: dashed;
+}
+
+/* Inner outline of a weak entity or multivalued attribute. The 4px inset is
+   DOUBLE_OUTLINE_INSET in geometry/shapes.ts, the same one the export uses. */
+.chen-shape.is-doubled::after {
+  border: var(--chen-shape-stroke-width) solid var(--chen-component-stroke);
+  border-radius: inherit;
+  content: '';
+  inset: 4px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.chen-shape-outline .chen-shape-inner {
+  fill: none;
+}
+
 .chen-shape.is-selected.chen-entity,
 .chen-shape.is-selected.chen-attribute {
   border-color: var(--chen-accent);
