@@ -38,12 +38,26 @@ import type {
 /** Colour a component is drawn in, or `null` to follow the interface ink. */
 export type ComponentColor = Color | null;
 
-export type EntityNodeData = { label: string; renaming: boolean; color: ComponentColor };
-export type RelationshipNodeData = { label: string; renaming: boolean; color: ComponentColor };
+/** `doubled`: a weak entity, identifying relationship or multivalued attribute (SPEC.md §6). */
+export type EntityNodeData = {
+  label: string;
+  renaming: boolean;
+  color: ComponentColor;
+  doubled: boolean;
+};
+export type RelationshipNodeData = {
+  label: string;
+  renaming: boolean;
+  color: ComponentColor;
+  doubled: boolean;
+};
 export type AttributeNodeData = {
   label: string;
   renaming: boolean;
   color: ComponentColor;
+  doubled: boolean;
+  /** Dashed outline: a derived attribute. */
+  dashed: boolean;
   /** Solid underline: a key. */
   isKey: boolean;
   /** Dashed underline: a weak entity's partial key. */
@@ -147,6 +161,7 @@ export function buildScene(input: SceneInput): Scene {
         label: entity.name,
         renaming: renamingId === entity.id,
         color: colorFor(presentation, entity.id, 'entity'),
+        doubled: entity.kind === 'weak',
       },
     });
     boxes.set(entity.id, boxFromTopLeft('rect', position, size));
@@ -167,6 +182,7 @@ export function buildScene(input: SceneInput): Scene {
         label: relationship.name,
         renaming: renamingId === relationship.id,
         color: colorFor(presentation, relationship.id, 'relationship'),
+        doubled: relationship.kind === 'identifying',
       },
     });
     const box = boxFromTopLeft('diamond', position, size);
@@ -221,6 +237,8 @@ export function buildScene(input: SceneInput): Scene {
           label: attribute.name,
           renaming: renamingId === attribute.id,
           color: colorFor(presentation, attribute.id, 'attribute'),
+          doubled: attribute.shape === 'multivalued',
+          dashed: attribute.shape === 'derived',
           isKey: attribute.identifier !== 'none',
           isPartialKey: attribute.identifier === 'partial',
           isPrimaryKey: attribute.identifier === 'key',

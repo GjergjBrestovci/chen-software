@@ -17,16 +17,6 @@ import type { ErDocument, Id } from '../model/types';
  */
 export type Theme = 'light' | 'dark';
 
-/**
- * Which component the context menu is open on, and where it was opened. The
- * column panel opens in the same place, for the attribute it was chosen on.
- */
-export interface ContextMenuState {
-  elementId: Id;
-  x: number;
-  y: number;
-}
-
 /** A question the student has to answer before something irreversible happens. */
 export interface Confirmation {
   message: string;
@@ -46,8 +36,6 @@ export interface UiStore {
   relationshipMode: RelationshipMode;
   snapToGrid: boolean;
   theme: Theme;
-  contextMenu: ContextMenuState | null;
-  columnPanel: ContextMenuState | null;
   confirmation: Confirmation | null;
   /**
    * The document as it was when last written to a file. Compared by reference,
@@ -71,10 +59,6 @@ export interface UiStore {
   cancelRelationshipMode: () => void;
   toggleSnapToGrid: () => void;
   toggleTheme: () => void;
-  openContextMenu: (menu: ContextMenuState) => void;
-  closeContextMenu: () => void;
-  openColumnPanel: (panel: ContextMenuState) => void;
-  closeColumnPanel: () => void;
   ask: (confirmation: Confirmation) => void;
   dismissConfirmation: () => void;
   markExported: (document: ErDocument) => void;
@@ -132,8 +116,6 @@ export const useUiStore = create<UiStore>()(
       relationshipMode: IDLE,
       snapToGrid: true,
       theme: preferredTheme(),
-      contextMenu: null,
-      columnPanel: null,
       confirmation: null,
       exportedDocument: null,
       exportDialogOpen: false,
@@ -169,18 +151,6 @@ export const useUiStore = create<UiStore>()(
       },
       toggleTheme: () => {
         set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' }));
-      },
-      openContextMenu: (menu) => {
-        set({ contextMenu: menu });
-      },
-      closeContextMenu: () => {
-        set({ contextMenu: null });
-      },
-      openColumnPanel: (panel) => {
-        set({ contextMenu: null, columnPanel: panel });
-      },
-      closeColumnPanel: () => {
-        set({ columnPanel: null });
       },
       ask: (confirmation) => {
         set({ confirmation });

@@ -157,6 +157,7 @@ export const messages = {
 
   menu: {
     label: 'Component options',
+    selectionCount: (count: number): string => `${String(count)} components selected`,
     rename: 'Rename',
     delete: 'Delete',
     colour: 'Colour',
@@ -178,7 +179,6 @@ export const messages = {
     partialKey: 'Partial key',
     relational: 'Relational',
     foreignKey: 'Foreign key',
-    columnDetails: 'Column details…',
     keysAreEntityOnly: 'Only an entity attribute can be a key.',
     compositeHasParts: 'Delete its parts before changing the shape.',
   },
@@ -195,6 +195,7 @@ export const messages = {
     scale: 'Scale',
     notNull: 'NOT NULL',
     keyIsNotNull: 'A key is always NOT NULL.',
+    keyIsUnique: 'A primary key is always UNIQUE.',
     unique: 'UNIQUE',
     autoIncrement: 'AUTO_INCREMENT',
     defaultValue: 'Default',

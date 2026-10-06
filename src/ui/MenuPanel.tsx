@@ -1,19 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react';
-import { clampToViewport } from './viewport';
 
 /**
- * A menu anchored at a screen position.
+ * A menu docked in the sidebar.
  *
- * Presentational only: it knows about focus, dismissal and staying on screen,
- * and nothing about diagrams. Escape closes it, a click elsewhere closes it,
- * and the arrow keys move between items, which is what SPEC.md §10 asks for.
+ * Presentational only: it knows about keyboard movement and nothing about
+ * diagrams. The arrow keys move between items, which is what SPEC.md §10 asks
+ * for. Other keys reach the canvas shortcuts, so Delete and Ctrl+Z still work
+ * after clicking an item.
  */
-export interface ContextMenuProps {
-  x: number;
-  y: number;
+export interface MenuPanelProps {
   label: string;
-  onClose: () => void;
   children: ReactNode;
 }
 
@@ -21,42 +18,10 @@ function focusableItems(root: HTMLElement): HTMLElement[] {
   return [...root.querySelectorAll<HTMLElement>('[data-menu-item]:not(:disabled)')];
 }
 
-export function ContextMenu({ x, y, label, onClose, children }: ContextMenuProps): ReactElement {
+export function MenuPanel({ label, children }: MenuPanelProps): ReactElement {
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const menu = menuRef.current;
-    if (!menu) {
-      return;
-    }
-    clampToViewport(menu, x, y);
-    focusableItems(menu)[0]?.focus();
-  }, [x, y]);
-
-  useEffect(() => {
-    const onPointerDown = (event: PointerEvent): void => {
-      if (event.target instanceof Node && menuRef.current?.contains(event.target)) {
-        return;
-      }
-      onClose();
-    };
-
-    // Capture, so the canvas underneath never also acts on the click.
-    globalThis.addEventListener('pointerdown', onPointerDown, true);
-    return () => {
-      globalThis.removeEventListener('pointerdown', onPointerDown, true);
-    };
-  }, [onClose]);
-
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    // The canvas listens on window; nothing typed in here is a shortcut.
-    event.stopPropagation();
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      onClose();
-      return;
-    }
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
       return;
     }
@@ -74,16 +39,7 @@ export function ContextMenu({ x, y, label, onClose, children }: ContextMenuProps
   };
 
   return (
-    <div
-      ref={menuRef}
-      className="chen-context-menu"
-      role="menu"
-      aria-label={label}
-      onKeyDown={onKeyDown}
-      onContextMenu={(event) => {
-        event.preventDefault();
-      }}
-    >
+    <div ref={menuRef} className="chen-menu" role="menu" aria-label={label} onKeyDown={onKeyDown}>
       {children}
     </div>
   );

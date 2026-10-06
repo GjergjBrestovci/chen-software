@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent, ReactElement } from 'react';
 import {
   Background,
@@ -48,6 +48,18 @@ const edgeTypes = { chen: ChenEdge };
  * custom property, so the two themes are spelled out here. These are the only
  * colours in the app that live outside `styles/global.css`.
  */
+const MIN_ZOOM = 0.2;
+const MAX_ZOOM = 2.5;
+
+/**
+ * Zoom per unit of wheel delta, as a power of two. React Flow's own step is
+ * 0.002 and only multiplied by 10 on macOS, which makes pinch and Ctrl+wheel
+ * sluggish elsewhere. Raise it to zoom faster.
+ */
+const ZOOM_SENSITIVITY = 0.01;
+/** Caps one mouse-wheel notch (deltaY ~100) at about 1.4x, so it never jumps. */
+const MAX_ZOOM_DELTA = 50;
+
 const GRID_COLORS = {
   light: { fine: '#e4e7ec', coarse: '#d0d5dd' },
   dark: { fine: '#23272f', coarse: '#2c313a' },
@@ -67,7 +79,7 @@ function canOwnAttribute(node: AppNode): boolean {
 
 export function Canvas(): ReactElement {
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getViewport, setViewport } = useReactFlow();
 
   const document = useDocumentStore((state) => state.document);
   const addEntityAt = useDocumentStore((state) => state.addEntityAt);
@@ -90,8 +102,6 @@ export function Canvas(): ReactElement {
   const notify = useUiStore((state) => state.notify);
   const theme = useUiStore((state) => state.theme);
   const toggleTheme = useUiStore((state) => state.toggleTheme);
-  const openContextMenu = useUiStore((state) => state.openContextMenu);
-  const closeContextMenu = useUiStore((state) => state.closeContextMenu);
   const openExportDialog = useUiStore((state) => state.openExportDialog);
   const openSqlDialog = useUiStore((state) => state.openSqlDialog);
 
@@ -106,6 +116,34 @@ export function Canvas(): ReactElement {
 
   // Undo can delete whatever is selected or being renamed out from under us.
   useUiReconciler(document);
+
+  // Ctrl+wheel and trackpad pinch (which the browser reports as Ctrl+wheel)
+  // zoom around the pointer. Captured before React Flow sees the event.
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+    const onWheel = (event: WheelEvent): void => {
+      if (!event.ctrlKey) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const delta = Math.max(-MAX_ZOOM_DELTA, Math.min(MAX_ZOOM_DELTA, event.deltaY));
+      const { x, y, zoom } = getViewport();
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom * 2 ** (-delta * ZOOM_SENSITIVITY)));
+      const rect = wrapper.getBoundingClientRect();
+      const px = event.clientX - rect.left;
+      const py = event.clientY - rect.top;
+      const scale = next / zoom;
+      void setViewport({ x: px - (px - x) * scale, y: py - (py - y) * scale, zoom: next });
+    };
+    wrapper.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    return () => {
+      wrapper.removeEventListener('wheel', onWheel, { capture: true });
+    };
+  }, [getViewport, setViewport]);
 
   /**
    * Positions mid-drag. Kept out of the document on purpose: the store is only
@@ -188,14 +226,6 @@ export function Canvas(): ReactElement {
       cancelRelationshipMode();
     },
     [armRelationshipFrom, cancelRelationshipMode, createRelationship, notify, relationshipMode],
-  );
-
-  const onNodeContextMenu = useCallback(
-    (event: ReactMouseEvent, node: AppNode) => {
-      event.preventDefault();
-      openContextMenu({ elementId: node.id, x: event.clientX, y: event.clientY });
-    },
-    [openContextMenu],
   );
 
   const onNodeDoubleClick = useCallback(
@@ -332,12 +362,14 @@ export function Canvas(): ReactElement {
     stopRenaming();
   }, [remove, selectedIds, setSelectedIds, stopRenaming]);
 
+  // Escape backs out one step: relationship mode first, then the selection.
   const onEscape = useCallback(() => {
-    closeContextMenu();
     if (relationshipMode.active) {
       cancelRelationshipMode();
+    } else {
+      setSelectedIds([]);
     }
-  }, [cancelRelationshipMode, closeContextMenu, relationshipMode.active]);
+  }, [cancelRelationshipMode, relationshipMode.active, setSelectedIds]);
 
   useKeyboardShortcuts(
     useMemo(
@@ -382,8 +414,6 @@ export function Canvas(): ReactElement {
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
-        onNodeContextMenu={onNodeContextMenu}
-        onPaneClick={closeContextMenu}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
         connectionMode={ConnectionMode.Loose}
@@ -398,8 +428,11 @@ export function Canvas(): ReactElement {
         multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
         selectionOnDrag
         panOnDrag={[1, 2]}
-        minZoom={0.2}
-        maxZoom={2.5}
+        // The wheel scrolls (Shift for sideways); Ctrl+wheel and pinch zoom.
+        panOnScroll
+        zoomOnScroll={false}
+        minZoom={MIN_ZOOM}
+        maxZoom={MAX_ZOOM}
         fitView
         proOptions={{ hideAttribution: true }}
         aria-label={messages.canvas.label}

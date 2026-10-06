@@ -1,22 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { FormEvent, KeyboardEvent, ReactElement } from 'react';
 import { messages } from '../i18n/messages.en';
 import { isIntegerType, SQL_TYPES, takesLength, takesPrecision } from '../model/column';
-import { attributesOf, findAttribute } from '../model/queries';
+import { attributesOf } from '../model/queries';
 import type { Attribute, ErDocument } from '../model/types';
 import { useDocumentStore } from '../store/documentStore';
-import { useUiStore } from '../store/uiStore';
 import { fromDraft, isSqlType, toDraft } from './columnDraft';
 import type { ColumnDraft } from './columnDraft';
-import { clampToViewport } from './viewport';
 
 /**
- * Column details for one attribute, opened from its right-click menu. They
- * only matter to Export SQL, so they live here rather than on the diagram.
+ * Column details for the selected attribute, shown in the sidebar. They only
+ * matter to Export SQL, so they live here rather than on the diagram.
  *
- * It is a small form rather than more menu items because it has text and
- * number fields, which the menu's arrow-key navigation would get in the way
- * of. The whole form is applied at once, as one undo entry.
+ * It is a small form, kept outside the sidebar's menu, because the menu's
+ * arrow-key navigation would get in the way of its fields. The whole form is
+ * applied at once, as one undo entry.
  */
 
 const text = messages.column;
@@ -28,19 +26,12 @@ function nameOf(attribute: Attribute): string {
 interface FormProps {
   document: ErDocument;
   attribute: Attribute;
-  close: () => void;
 }
 
-function ColumnForm({ document, attribute, close }: FormProps): ReactElement {
+function ColumnForm({ document, attribute }: FormProps): ReactElement {
   const setAttributeColumn = useDocumentStore((state) => state.setAttributeColumn);
   const [draft, setDraft] = useState<ColumnDraft>(() => toDraft(attribute.column));
   const [error, setError] = useState<string | null>(null);
-  const firstFieldRef = useRef<HTMLSelectElement>(null);
-
-  useEffect(() => {
-    firstFieldRef.current?.focus();
-  }, []);
-
   const change = (changes: Partial<ColumnDraft>): void => {
     setDraft((current) => ({ ...current, ...changes }));
     setError(null);
@@ -54,18 +45,23 @@ function ColumnForm({ document, attribute, close }: FormProps): ReactElement {
       return;
     }
     setAttributeColumn(attribute.id, outcome.spec);
-    close();
   };
 
   const type = draft.type === '' ? null : draft.type;
   const isKey = attribute.ownerKind === 'entity' && attribute.identifier !== 'none';
+  // Only a single-column primary key is unique by itself. Each column of a
+  // composite key, or a partial key, can repeat.
+  const isSoleKey =
+    attribute.ownerKind === 'entity' &&
+    attribute.identifier === 'key' &&
+    attributesOf(document.model, attribute.ownerId).filter((other) => other.identifier === 'key')
+      .length === 1;
 
   return (
     <form onSubmit={onSubmit} noValidate>
       <label className="chen-field">
         <span>{text.type}</span>
         <select
-          ref={firstFieldRef}
           value={draft.type}
           onChange={(event) => {
             change({ type: isSqlType(event.target.value) ? event.target.value : '' });
@@ -136,12 +132,16 @@ function ColumnForm({ document, attribute, close }: FormProps): ReactElement {
       <label className="chen-check">
         <input
           type="checkbox"
-          checked={draft.unique}
+          checked={isSoleKey || draft.unique}
+          disabled={isSoleKey}
           onChange={(event) => {
             change({ unique: event.target.checked });
           }}
         />
-        {text.unique}
+        <span>
+          {text.unique}
+          {isSoleKey && <small>{text.keyIsUnique}</small>}
+        </span>
       </label>
 
       {type !== null && isIntegerType(type) && (
@@ -196,9 +196,6 @@ function ColumnForm({ document, attribute, close }: FormProps): ReactElement {
       )}
 
       <div className="chen-dialog-actions">
-        <button type="button" onClick={close}>
-          {messages.dialog.cancel}
-        </button>
         <button type="submit" className="chen-dialog-primary">
           {text.apply}
         </button>
@@ -216,73 +213,31 @@ function noColumnReason(document: ErDocument, attribute: Attribute): string | nu
   return null;
 }
 
-export function ColumnPanel(): ReactElement | null {
-  const document = useDocumentStore((state) => state.document);
-  const panel = useUiStore((state) => state.columnPanel);
-  const close = useUiStore((state) => state.closeColumnPanel);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (panel && panelRef.current) {
-      clampToViewport(panelRef.current, panel.x, panel.y);
-    }
-  }, [panel]);
-
-  useEffect(() => {
-    if (!panel) return;
-    const onPointerDown = (event: PointerEvent): void => {
-      if (event.target instanceof Node && panelRef.current?.contains(event.target)) {
-        return;
-      }
-      close();
-    };
-    // Capture, so the canvas underneath never also acts on the click.
-    globalThis.addEventListener('pointerdown', onPointerDown, true);
-    return () => {
-      globalThis.removeEventListener('pointerdown', onPointerDown, true);
-    };
-  }, [panel, close]);
-
-  const attribute = panel ? findAttribute(document.model, panel.elementId) : undefined;
-  if (!panel || !attribute) {
-    return null;
-  }
-
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
-    // The canvas listens on window; nothing typed in here is a shortcut.
-    event.stopPropagation();
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close();
-    }
-  };
-
+export function ColumnDetails({ document, attribute }: FormProps): ReactElement {
   const reason = noColumnReason(document, attribute);
-  const title = text.title(nameOf(attribute));
 
   return (
-    <div
-      ref={panelRef}
-      className="chen-context-menu chen-column-panel"
-      role="dialog"
-      aria-label={title}
-      onKeyDown={onKeyDown}
+    <section
+      className="chen-column-panel"
+      aria-label={text.title(nameOf(attribute))}
+      onKeyDown={(event: KeyboardEvent<HTMLElement>) => {
+        // The canvas listens on window; nothing typed in here is a shortcut.
+        event.stopPropagation();
+      }}
     >
-      <h2>{title}</h2>
+      <span className="chen-menu-group-label">{text.label}</span>
       <p className="chen-panel-hint">{text.hint}</p>
       {reason === null ? (
-        // Keyed by attribute, so switching attributes starts a fresh draft.
-        <ColumnForm key={attribute.id} document={document} attribute={attribute} close={close} />
+        // Keyed by the stored column, so switching attributes, applying or
+        // undoing starts a fresh draft from what is really stored.
+        <ColumnForm
+          key={`${attribute.id}:${JSON.stringify(attribute.column)}`}
+          document={document}
+          attribute={attribute}
+        />
       ) : (
-        <>
-          <p>{reason}</p>
-          <div className="chen-dialog-actions">
-            <button type="button" onClick={close}>
-              {messages.dialog.close}
-            </button>
-          </div>
-        </>
+        <p>{reason}</p>
       )}
-    </div>
+    </section>
   );
 }

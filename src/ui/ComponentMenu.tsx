@@ -1,20 +1,35 @@
 import type { ReactElement } from 'react';
-import { ContextMenu, MenuGroup, MenuItem } from './ContextMenu';
+import { ColumnDetails } from './ColumnDetails';
+import { MenuGroup, MenuItem, MenuPanel } from './MenuPanel';
 import { messages } from '../i18n/messages.en';
 import { COLOR_PALETTE, hasColorOverride } from '../model/presentation';
 import { findAttribute, findElementRef, findEntity, findRelationship } from '../model/queries';
-import type { AttributeIdentifier, AttributeShape, ErDocument, Id } from '../model/types';
+import type {
+  Attribute,
+  AttributeIdentifier,
+  AttributeShape,
+  Entity,
+  ErDocument,
+  Id,
+  Relationship,
+} from '../model/types';
 import { useDocumentStore } from '../store/documentStore';
 import { useUiStore } from '../store/uiStore';
 
 /**
- * The right-click menu over one component (SPEC.md §5).
+ * The sidebar for the selected components (SPEC.md §5). Selecting opens it;
+ * clearing the selection closes it.
  *
- * Every item dispatches a `documentStore` action, the same ones the Inspector
- * will use, so there is exactly one implementation of each edit. Options that
- * the model would refuse are disabled rather than offered and then rejected:
- * an attribute on a relationship cannot be a key, and a composite cannot
- * change shape while it still has parts.
+ * With several selected, it offers only what applies to every one of them:
+ * colour and delete always, a kind, shape or key only when all are the same
+ * sort of component. An option shows as set only when it is set on all of
+ * them, and one click changes all of them as a single undo entry.
+ *
+ * Every item dispatches a `documentStore` action, so there is exactly one
+ * implementation of each edit. An edit the model would refuse for any one of
+ * them is refused for all, with a notice saying why: an attribute on a
+ * relationship cannot be a key, and a composite cannot change shape while it
+ * still has parts.
  */
 
 const SHAPES: { shape: AttributeShape; label: string }[] = [
@@ -30,18 +45,19 @@ const IDENTIFIERS: { identifier: AttributeIdentifier; label: string }[] = [
   { identifier: 'partial', label: messages.menu.partialKey },
 ];
 
-interface SectionProps {
+interface SectionProps<T> {
   document: ErDocument;
-  elementId: Id;
-  close: () => void;
+  ids: Id[];
+  items: T[];
 }
 
-function EntitySection({ document, elementId, close }: SectionProps): ReactElement | null {
+/** True when every value is `expected`, so an option shows as set. */
+function all<T>(values: readonly T[], expected: T): boolean {
+  return values.length > 0 && values.every((value) => value === expected);
+}
+
+function EntitySection({ ids, items }: SectionProps<Entity>): ReactElement {
   const setEntityKind = useDocumentStore((state) => state.setEntityKind);
-  const entity = findEntity(document.model, elementId);
-  if (!entity) {
-    return null;
-  }
 
   return (
     <MenuGroup label={messages.menu.entityKind}>
@@ -49,10 +65,12 @@ function EntitySection({ document, elementId, close }: SectionProps): ReactEleme
         <MenuItem
           key={kind}
           label={kind === 'regular' ? messages.menu.regular : messages.menu.weak}
-          pressed={entity.kind === kind}
+          pressed={all(
+            items.map((entity) => entity.kind),
+            kind,
+          )}
           onSelect={() => {
-            setEntityKind(elementId, kind);
-            close();
+            setEntityKind(ids, kind);
           }}
         />
       ))}
@@ -60,12 +78,8 @@ function EntitySection({ document, elementId, close }: SectionProps): ReactEleme
   );
 }
 
-function RelationshipSection({ document, elementId, close }: SectionProps): ReactElement | null {
+function RelationshipSection({ ids, items }: SectionProps<Relationship>): ReactElement {
   const setRelationshipKind = useDocumentStore((state) => state.setRelationshipKind);
-  const relationship = findRelationship(document.model, elementId);
-  if (!relationship) {
-    return null;
-  }
 
   return (
     <MenuGroup label={messages.menu.relationshipKind}>
@@ -73,10 +87,12 @@ function RelationshipSection({ document, elementId, close }: SectionProps): Reac
         <MenuItem
           key={kind}
           label={kind === 'regular' ? messages.menu.regular : messages.menu.identifying}
-          pressed={relationship.kind === kind}
+          pressed={all(
+            items.map((relationship) => relationship.kind),
+            kind,
+          )}
           onSelect={() => {
-            setRelationshipKind(elementId, kind);
-            close();
+            setRelationshipKind(ids, kind);
           }}
         />
       ))}
@@ -84,21 +100,18 @@ function RelationshipSection({ document, elementId, close }: SectionProps): Reac
   );
 }
 
-function AttributeSection({ document, elementId, close }: SectionProps): ReactElement | null {
-  const contextMenu = useUiStore((state) => state.contextMenu);
-  const openColumnPanel = useUiStore((state) => state.openColumnPanel);
+function AttributeSection({ document, ids, items }: SectionProps<Attribute>): ReactElement {
   const setAttributeShape = useDocumentStore((state) => state.setAttributeShape);
   const setAttributeIdentifier = useDocumentStore((state) => state.setAttributeIdentifier);
   const setAttributeForeignKey = useDocumentStore((state) => state.setAttributeForeignKey);
   const notify = useUiStore((state) => state.notify);
 
-  const attribute = findAttribute(document.model, elementId);
-  if (!attribute) {
-    return null;
-  }
-
-  const hasParts = document.model.attributes.some((part) => part.ownerId === elementId);
-  const canBeKey = attribute.ownerKind === 'entity';
+  const anyHasParts = document.model.attributes.some((part) => ids.includes(part.ownerId));
+  const allCanBeKeys = items.every((attribute) => attribute.ownerKind === 'entity');
+  const allForeign = all(
+    items.map((attribute) => attribute.foreignKey),
+    true,
+  );
 
   return (
     <>
@@ -107,14 +120,16 @@ function AttributeSection({ document, elementId, close }: SectionProps): ReactEl
           <MenuItem
             key={shape}
             label={label}
-            pressed={attribute.shape === shape}
+            pressed={all(
+              items.map((attribute) => attribute.shape),
+              shape,
+            )}
             onSelect={() => {
-              if (shape !== 'composite' && hasParts) {
+              if (shape !== 'composite' && anyHasParts) {
                 notify(messages.menu.compositeHasParts);
                 return;
               }
-              setAttributeShape(elementId, shape);
-              close();
+              setAttributeShape(ids, shape);
             }}
           />
         ))}
@@ -125,14 +140,16 @@ function AttributeSection({ document, elementId, close }: SectionProps): ReactEl
           <MenuItem
             key={identifier}
             label={label}
-            pressed={attribute.identifier === identifier}
+            pressed={all(
+              items.map((attribute) => attribute.identifier),
+              identifier,
+            )}
             onSelect={() => {
-              if (identifier !== 'none' && !canBeKey) {
+              if (identifier !== 'none' && !allCanBeKeys) {
                 notify(messages.menu.keysAreEntityOnly);
                 return;
               }
-              setAttributeIdentifier(elementId, identifier);
-              close();
+              setAttributeIdentifier(ids, identifier);
             }}
           />
         ))}
@@ -142,21 +159,9 @@ function AttributeSection({ document, elementId, close }: SectionProps): ReactEl
         <MenuItem
           label={messages.menu.foreignKey}
           toggle
-          pressed={attribute.foreignKey}
+          pressed={allForeign}
           onSelect={() => {
-            setAttributeForeignKey(elementId, !attribute.foreignKey);
-            close();
-          }}
-        />
-        <MenuItem
-          label={messages.menu.columnDetails}
-          onSelect={() => {
-            // Opens where the menu was, so the student's eye does not have to move.
-            openColumnPanel({
-              elementId,
-              x: contextMenu?.x ?? 0,
-              y: contextMenu?.y ?? 0,
-            });
+            setAttributeForeignKey(ids, !allForeign);
           }}
         />
       </MenuGroup>
@@ -164,9 +169,9 @@ function AttributeSection({ document, elementId, close }: SectionProps): ReactEl
   );
 }
 
-function ColourSection({ document, elementId, close }: SectionProps): ReactElement {
+function ColourSection({ document, ids }: Omit<SectionProps<unknown>, 'items'>): ReactElement {
   const setElementColor = useDocumentStore((state) => state.setElementColor);
-  const overridden = hasColorOverride(document.presentation, elementId);
+  const colors = ids.map((id) => document.presentation.colors[id]);
 
   return (
     <MenuGroup label={messages.menu.colour}>
@@ -174,13 +179,12 @@ function ColourSection({ document, elementId, close }: SectionProps): ReactEleme
         type="button"
         data-menu-item
         role="menuitemradio"
-        aria-checked={!overridden}
+        aria-checked={ids.every((id) => !hasColorOverride(document.presentation, id))}
         aria-label={messages.menu.useThemeColour}
         title={messages.menu.useThemeColour}
         className="chen-swatch chen-swatch--theme"
         onClick={() => {
-          setElementColor(elementId, null);
-          close();
+          setElementColor(ids, null);
         }}
       />
       {COLOR_PALETTE.map((color, index) => (
@@ -189,14 +193,13 @@ function ColourSection({ document, elementId, close }: SectionProps): ReactEleme
           type="button"
           data-menu-item
           role="menuitemradio"
-          aria-checked={document.presentation.colors[elementId] === color}
+          aria-checked={all(colors, color)}
           aria-label={messages.menu.swatch(index + 1)}
           title={color}
           className="chen-swatch"
           style={{ background: color }}
           onClick={() => {
-            setElementColor(elementId, color);
-            close();
+            setElementColor(ids, color);
           }}
         />
       ))}
@@ -204,55 +207,76 @@ function ColourSection({ document, elementId, close }: SectionProps): ReactEleme
   );
 }
 
+/** `items` when `find` finds every id, otherwise `null`: the selection is mixed. */
+function allOf<T>(ids: readonly Id[], find: (id: Id) => T | undefined): T[] | null {
+  const items: T[] = [];
+  for (const id of ids) {
+    const item = find(id);
+    if (item === undefined) {
+      return null;
+    }
+    items.push(item);
+  }
+  return items;
+}
+
 export function ComponentMenu(): ReactElement | null {
   const document = useDocumentStore((state) => state.document);
   const remove = useDocumentStore((state) => state.remove);
-  const contextMenu = useUiStore((state) => state.contextMenu);
-  const closeContextMenu = useUiStore((state) => state.closeContextMenu);
+  const selectedIds = useUiStore((state) => state.selectedIds);
+  const setSelectedIds = useUiStore((state) => state.setSelectedIds);
   const startRenaming = useUiStore((state) => state.startRenaming);
+  const linking = useUiStore((state) => state.relationshipMode.active);
 
-  if (!contextMenu) {
+  const { model } = document;
+  // Undo can remove a selected component before the selection catches up.
+  const ids = selectedIds.filter((id) => findElementRef(model, id) !== undefined);
+  // Hidden while picking entities for a relationship, so it never covers one.
+  if (linking || ids.length === 0) {
     return null;
   }
 
-  const element = findElementRef(document.model, contextMenu.elementId);
-  if (!element) {
-    return null;
-  }
-
-  const elementId = contextMenu.elementId;
-  const sectionProps = { document, elementId, close: closeContextMenu };
+  const entities = allOf(ids, (id) => findEntity(model, id));
+  const relationships = allOf(ids, (id) => findRelationship(model, id));
+  const attributes = allOf(ids, (id) => findAttribute(model, id));
+  const [onlyId] = ids;
+  const single = ids.length === 1 ? onlyId : undefined;
+  const singleAttribute = single === undefined ? undefined : attributes?.[0];
+  const title =
+    single === undefined ? messages.menu.selectionCount(ids.length) : messages.menu.label;
 
   return (
-    <ContextMenu
-      x={contextMenu.x}
-      y={contextMenu.y}
-      label={messages.menu.label}
-      onClose={closeContextMenu}
-    >
-      <MenuGroup label={messages.menu.label}>
-        <MenuItem
-          label={messages.menu.rename}
-          onSelect={() => {
-            startRenaming(elementId);
-            closeContextMenu();
-          }}
-        />
-        <MenuItem
-          label={messages.menu.delete}
-          danger
-          onSelect={() => {
-            remove([elementId]);
-            closeContextMenu();
-          }}
-        />
-      </MenuGroup>
+    <aside className="chen-sidebar" aria-label={messages.menu.label}>
+      <MenuPanel label={messages.menu.label}>
+        <MenuGroup label={title}>
+          {single !== undefined && (
+            <MenuItem
+              label={messages.menu.rename}
+              onSelect={() => {
+                startRenaming(single);
+              }}
+            />
+          )}
+          <MenuItem
+            label={messages.menu.delete}
+            danger
+            onSelect={() => {
+              remove(ids);
+              setSelectedIds([]);
+            }}
+          />
+        </MenuGroup>
 
-      {element.kind === 'entity' && <EntitySection {...sectionProps} />}
-      {element.kind === 'relationship' && <RelationshipSection {...sectionProps} />}
-      {element.kind === 'attribute' && <AttributeSection {...sectionProps} />}
+        {entities && <EntitySection document={document} ids={ids} items={entities} />}
+        {relationships && (
+          <RelationshipSection document={document} ids={ids} items={relationships} />
+        )}
+        {attributes && <AttributeSection document={document} ids={ids} items={attributes} />}
 
-      <ColourSection {...sectionProps} />
-    </ContextMenu>
+        <ColourSection document={document} ids={ids} />
+      </MenuPanel>
+
+      {singleAttribute && <ColumnDetails document={document} attribute={singleAttribute} />}
+    </aside>
   );
 }

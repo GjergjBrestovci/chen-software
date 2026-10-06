@@ -173,7 +173,6 @@ export function Toolbar(props: ToolbarProps): ReactElement {
       <button
         type="button"
         onClick={props.onToggleTheme}
-        aria-pressed={props.theme === 'dark'}
         title={toolbar.darkTheme}
         aria-label={toolbar.darkTheme}
       >

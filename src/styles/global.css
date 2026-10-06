@@ -113,6 +113,26 @@ body {
   vector-effect: non-scaling-stroke;
 }
 
+/* A derived attribute (SPEC.md §6). */
+.chen-attribute.is-dashed {
+  border-style: dashed;
+}
+
+/* Inner outline of a weak entity or multivalued attribute. The 4px inset is
+   DOUBLE_OUTLINE_INSET in geometry/shapes.ts, the same one the export uses. */
+.chen-shape.is-doubled::after {
+  border: var(--chen-shape-stroke-width) solid var(--chen-component-stroke);
+  border-radius: inherit;
+  content: '';
+  inset: 4px;
+  pointer-events: none;
+  position: absolute;
+}
+
+.chen-shape-outline .chen-shape-inner {
+  fill: none;
+}
+
 .chen-shape.is-selected.chen-entity,
 .chen-shape.is-selected.chen-attribute {
   border-color: var(--chen-accent);
@@ -447,20 +467,37 @@ body {
   padding: 0;
 }
 
-/* ---------- context menu ---------- */
+/* ---------- sidebar ---------- */
 
-.chen-context-menu {
+/* The options for the selected components, docked on the right. */
+.chen-sidebar {
   background: var(--chen-surface);
-  border: 1px solid var(--chen-border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(16 24 40 / 18%);
+  border-left: 1px solid var(--chen-border);
+  bottom: 0;
+  box-shadow: -4px 0 16px rgb(16 24 40 / 10%);
+  overflow-y: auto;
+  padding: 10px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 260px;
+  z-index: 20;
+}
+
+/* Keep the toolbar clear of the sidebar while it is open. */
+.chen-app:has(.chen-sidebar) .chen-toolbar {
+  max-width: calc(100vw - 260px - 32px);
+}
+
+.chen-menu {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  max-width: 280px;
-  padding: 6px;
-  position: fixed;
-  z-index: 20;
+}
+
+.chen-menu button:focus-visible {
+  outline: 2px solid var(--chen-accent);
+  outline-offset: 1px;
 }
 
 .chen-menu-group {
@@ -531,11 +568,6 @@ body {
 .chen-swatch--theme {
   background: var(--chen-shape-fill);
   box-shadow: inset 0 0 0 2px var(--chen-line);
-}
-
-.chen-context-menu button:focus-visible {
-  outline: 2px solid var(--chen-accent);
-  outline-offset: 1px;
 }
 
 /* React Flow's own chrome has to follow the theme too. */
@@ -731,21 +763,18 @@ body {
 /* ---------- column details and SQL export ---------- */
 
 .chen-column-panel {
-  gap: 10px;
-  max-width: 300px;
-  padding: 12px 14px;
-  width: 300px;
+  border-top: 1px solid var(--chen-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px 6px 2px;
 }
 
 .chen-column-panel form {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.chen-column-panel h2 {
-  font-size: 14px;
-  margin: 0;
 }
 
 .chen-column-panel p {

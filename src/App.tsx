@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import type { ReactElement } from 'react';
 import { Canvas } from './canvas/Canvas';
-import { ColumnPanel } from './ui/ColumnPanel';
 import { ComponentMenu } from './ui/ComponentMenu';
 import { ConfirmDialog } from './ui/ConfirmDialog';
 import { ExportDialog } from './ui/ExportDialog';
@@ -23,7 +22,6 @@ export function App(): ReactElement {
       <div className="chen-app">
         <Canvas />
         <ComponentMenu />
-        <ColumnPanel />
         <ConfirmDialog />
         <ExportDialog />
         <SqlExportDialog />
