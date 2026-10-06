@@ -39,18 +39,29 @@ export interface DocumentStore {
   rename: (id: Id, name: string) => void;
   setCardinality: (relationshipId: Id, endIndex: number, value: Cardinality | null) => void;
   cycleCardinality: (relationshipId: Id, endIndex: number) => void;
-  setEntityKind: (id: Id, kind: EntityKind) => void;
-  setRelationshipKind: (id: Id, kind: RelationshipKind) => void;
-  setAttributeShape: (id: Id, shape: AttributeShape) => void;
-  setAttributeIdentifier: (id: Id, identifier: AttributeIdentifier) => void;
-  setAttributeForeignKey: (id: Id, foreignKey: boolean) => void;
+  // These take one id or several. Several is still one undo entry, and it is
+  // all or nothing: one id the model refuses leaves every one unchanged.
+  setEntityKind: (ids: Id | readonly Id[], kind: EntityKind) => void;
+  setRelationshipKind: (ids: Id | readonly Id[], kind: RelationshipKind) => void;
+  setAttributeShape: (ids: Id | readonly Id[], shape: AttributeShape) => void;
+  setAttributeIdentifier: (ids: Id | readonly Id[], identifier: AttributeIdentifier) => void;
+  setAttributeForeignKey: (ids: Id | readonly Id[], foreignKey: boolean) => void;
   setAttributeColumn: (id: Id, changes: Partial<ColumnSpec>) => void;
-  setElementColor: (id: Id, color: Color | null) => void;
+  setElementColor: (ids: Id | readonly Id[], color: Color | null) => void;
   setComponentTheme: (theme: ComponentTheme) => void;
   moveMany: (moves: readonly operations.ElementMove[]) => void;
   remove: (ids: readonly Id[]) => void;
   setTitle: (title: string) => void;
   replaceDocument: (document: ErDocument) => void;
+}
+
+/** Applies `operation` to each id in turn, giving one document for one `set`. */
+function forEachId(
+  document: ErDocument,
+  ids: Id | readonly Id[],
+  operation: (document: ErDocument, id: Id) => ErDocument,
+): ErDocument {
+  return (typeof ids === 'string' ? [ids] : ids).reduce(operation, document);
 }
 
 export const useDocumentStore = create<DocumentStore>()(
@@ -128,32 +139,56 @@ export const useDocumentStore = create<DocumentStore>()(
         });
       },
 
-      setEntityKind: (id, kind) => {
-        set({ document: operations.setEntityKind(get().document, id, kind) });
+      setEntityKind: (ids, kind) => {
+        set({
+          document: forEachId(get().document, ids, (document, id) =>
+            operations.setEntityKind(document, id, kind),
+          ),
+        });
       },
 
-      setRelationshipKind: (id, kind) => {
-        set({ document: operations.setRelationshipKind(get().document, id, kind) });
+      setRelationshipKind: (ids, kind) => {
+        set({
+          document: forEachId(get().document, ids, (document, id) =>
+            operations.setRelationshipKind(document, id, kind),
+          ),
+        });
       },
 
-      setAttributeShape: (id, shape) => {
-        set({ document: operations.setAttributeShape(get().document, id, shape) });
+      setAttributeShape: (ids, shape) => {
+        set({
+          document: forEachId(get().document, ids, (document, id) =>
+            operations.setAttributeShape(document, id, shape),
+          ),
+        });
       },
 
-      setAttributeIdentifier: (id, identifier) => {
-        set({ document: operations.setAttributeIdentifier(get().document, id, identifier) });
+      setAttributeIdentifier: (ids, identifier) => {
+        set({
+          document: forEachId(get().document, ids, (document, id) =>
+            operations.setAttributeIdentifier(document, id, identifier),
+          ),
+        });
       },
 
-      setAttributeForeignKey: (id, foreignKey) => {
-        set({ document: operations.setAttributeForeignKey(get().document, id, foreignKey) });
+      setAttributeForeignKey: (ids, foreignKey) => {
+        set({
+          document: forEachId(get().document, ids, (document, id) =>
+            operations.setAttributeForeignKey(document, id, foreignKey),
+          ),
+        });
       },
 
       setAttributeColumn: (id, changes) => {
         set({ document: operations.setAttributeColumn(get().document, id, changes) });
       },
 
-      setElementColor: (id, color) => {
-        set({ document: operations.setElementColor(get().document, id, color) });
+      setElementColor: (ids, color) => {
+        set({
+          document: forEachId(get().document, ids, (document, id) =>
+            operations.setElementColor(document, id, color),
+          ),
+        });
       },
 
       setComponentTheme: (theme) => {
