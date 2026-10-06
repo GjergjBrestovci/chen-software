@@ -7,6 +7,9 @@ import react from '@vitejs/plugin-react';
  * >=90% coverage of the *pure* logic only, and each milestone widens this list.
  */
 export default defineConfig({
+  // GitHub Pages serves a project site from /<repo>/; the deploy workflow sets
+  // BASE_PATH accordingly. Local dev and other hosts keep the root.
+  base: process.env.BASE_PATH ?? '/',
   plugins: [react()],
   test: {
     globals: true,
