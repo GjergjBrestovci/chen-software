@@ -195,6 +195,7 @@ export const messages = {
     scale: 'Scale',
     notNull: 'NOT NULL',
     keyIsNotNull: 'A key is always NOT NULL.',
+    keyIsUnique: 'A primary key is always UNIQUE.',
     unique: 'UNIQUE',
     autoIncrement: 'AUTO_INCREMENT',
     defaultValue: 'Default',

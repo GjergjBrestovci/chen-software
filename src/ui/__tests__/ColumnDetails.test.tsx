@@ -135,14 +135,30 @@ describe('ColumnDetails', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('shows a key as always NOT NULL', () => {
+  it('shows a single-column primary key as always NOT NULL and UNIQUE', () => {
     const { isbn } = seed();
     render(<ComponentMenu />);
     openOn(isbn);
     const notNull = screen.getByRole('checkbox', { name: new RegExp(text.notNull) });
     expect(notNull).toBeChecked();
     expect(notNull).toBeDisabled();
-    expect(screen.getByText(text.keyIsNotNull)).toBeInTheDocument();
+    const unique = screen.getByRole('checkbox', { name: new RegExp(text.unique) });
+    expect(unique).toBeChecked();
+    expect(unique).toBeDisabled();
+    expect(screen.getByText(text.keyIsUnique)).toBeInTheDocument();
+  });
+
+  it('leaves UNIQUE open on each column of a composite primary key', () => {
+    const { isbn, title } = seed();
+    act(() => {
+      store().setAttributeIdentifier(title, 'key');
+    });
+    render(<ComponentMenu />);
+    openOn(isbn);
+    const unique = screen.getByRole('checkbox', { name: new RegExp(text.unique) });
+    expect(unique).not.toBeChecked();
+    expect(unique).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: new RegExp(text.notNull) })).toBeDisabled();
   });
 
   it('offers the referenced entity only on a foreign key', async () => {

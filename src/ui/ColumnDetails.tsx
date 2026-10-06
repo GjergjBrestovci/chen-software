@@ -49,6 +49,13 @@ function ColumnForm({ document, attribute }: FormProps): ReactElement {
 
   const type = draft.type === '' ? null : draft.type;
   const isKey = attribute.ownerKind === 'entity' && attribute.identifier !== 'none';
+  // Only a single-column primary key is unique by itself. Each column of a
+  // composite key, or a partial key, can repeat.
+  const isSoleKey =
+    attribute.ownerKind === 'entity' &&
+    attribute.identifier === 'key' &&
+    attributesOf(document.model, attribute.ownerId).filter((other) => other.identifier === 'key')
+      .length === 1;
 
   return (
     <form onSubmit={onSubmit} noValidate>
@@ -125,12 +132,16 @@ function ColumnForm({ document, attribute }: FormProps): ReactElement {
       <label className="chen-check">
         <input
           type="checkbox"
-          checked={draft.unique}
+          checked={isSoleKey || draft.unique}
+          disabled={isSoleKey}
           onChange={(event) => {
             change({ unique: event.target.checked });
           }}
         />
-        {text.unique}
+        <span>
+          {text.unique}
+          {isSoleKey && <small>{text.keyIsUnique}</small>}
+        </span>
       </label>
 
       {type !== null && isIntegerType(type) && (
