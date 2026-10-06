@@ -157,6 +157,7 @@ export const messages = {
 
   menu: {
     label: 'Component options',
+    selectionCount: (count: number): string => `${String(count)} components selected`,
     rename: 'Rename',
     delete: 'Delete',
     colour: 'Colour',
@@ -178,7 +179,6 @@ export const messages = {
     partialKey: 'Partial key',
     relational: 'Relational',
     foreignKey: 'Foreign key',
-    columnDetails: 'Column details…',
     keysAreEntityOnly: 'Only an entity attribute can be a key.',
     compositeHasParts: 'Delete its parts before changing the shape.',
   },

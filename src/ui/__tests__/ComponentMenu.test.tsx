@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ComponentMenu } from '../ComponentMenu';
 import { Notice } from '../Notice';
@@ -35,7 +35,7 @@ function seed(): Seed {
 
 function openOn(elementId: Id): void {
   act(() => {
-    useUiStore.getState().openContextMenu({ elementId, x: 120, y: 80 });
+    useUiStore.getState().setSelectedIds([elementId]);
   });
 }
 
@@ -57,7 +57,6 @@ describe('ComponentMenu', () => {
       selectedIds: [],
       renamingId: null,
       relationshipMode: { active: false, firstEntityId: null },
-      contextMenu: null,
       notice: null,
     });
     return () => {
@@ -65,7 +64,7 @@ describe('ComponentMenu', () => {
     };
   });
 
-  it('shows nothing until it is opened on a component', () => {
+  it('shows nothing until a component is selected', () => {
     seed();
     renderMenu();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
@@ -87,7 +86,11 @@ describe('ComponentMenu', () => {
     await user.click(screen.getByRole('menuitemradio', { name: 'Weak' }));
 
     expect(findEntity(store().document.model, entity)?.kind).toBe('weak');
-    expect(useUiStore.getState().contextMenu).toBeNull();
+    // The sidebar stays open so the next edit is one click away.
+    expect(screen.getByRole('menuitemradio', { name: 'Weak' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
   });
 
   it('offers identifying for a relationship', async () => {
@@ -207,7 +210,6 @@ describe('ComponentMenu', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
 
     expect(useUiStore.getState().renamingId).toBe(entity);
-    expect(useUiStore.getState().contextMenu).toBeNull();
   });
 
   it('deletes the component, cascading as usual', async () => {
@@ -220,6 +222,7 @@ describe('ComponentMenu', () => {
 
     expect(findEntity(store().document.model, entity)).toBeUndefined();
     expect(store().document.model.relationships).toEqual([]);
+    expect(useUiStore.getState().selectedIds).toEqual([]);
   });
 
   it('records one undo entry per menu action', async () => {
@@ -234,42 +237,125 @@ describe('ComponentMenu', () => {
     expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before + 1);
   });
 
-  it('closes on Escape without changing anything', async () => {
-    const user = userEvent.setup();
+  it('closes when the selection is cleared', () => {
     const { entity } = seed();
     openOn(entity);
     renderMenu();
 
-    await user.keyboard('{Escape}');
-
-    await waitFor(() => {
-      expect(useUiStore.getState().contextMenu).toBeNull();
+    act(() => {
+      useUiStore.getState().setSelectedIds([]);
     });
-    expect(findEntity(store().document.model, entity)?.kind).toBe('regular');
+
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 
-  it('closes when the student clicks away', async () => {
-    const user = userEvent.setup();
-    const { entity } = seed();
-    openOn(entity);
-    renderMenu();
+  describe('with several components selected', () => {
+    function select(...ids: Id[]): void {
+      act(() => {
+        useUiStore.getState().setSelectedIds(ids);
+      });
+    }
 
-    await user.click(document.body);
+    it('offers colour and delete for a mixed selection, but no kinds or keys', () => {
+      const { entity, attribute } = seed();
+      select(entity, attribute);
+      renderMenu();
 
-    await waitFor(() => {
-      expect(useUiStore.getState().contextMenu).toBeNull();
+      expect(screen.getByText('2 components selected')).toBeInTheDocument();
+      expect(screen.getByRole('menuitemradio', { name: 'Colour 6' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
+      expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitemradio', { name: 'Weak' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('menuitemradio', { name: 'Primary key' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('region')).not.toBeInTheDocument();
+    });
+
+    it('colours every selected component as one undo entry', async () => {
+      const user = userEvent.setup();
+      const { entity, relationship, attribute } = seed();
+      select(entity, relationship, attribute);
+      renderMenu();
+
+      const before = useDocumentStore.temporal.getState().pastStates.length;
+      await user.click(screen.getByRole('menuitemradio', { name: 'Colour 6' }));
+
+      for (const id of [entity, relationship, attribute]) {
+        expect(store().document.presentation.colors[id]).toBe('#2563eb');
+      }
+      expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before + 1);
+      expect(screen.getByRole('menuitemradio', { name: 'Colour 6' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    });
+
+    it('makes several entity attributes primary keys at once', async () => {
+      const user = userEvent.setup();
+      const { entity, attribute } = seed();
+      const second = store().addAttributeTo(entity);
+      select(attribute, second);
+      renderMenu();
+
+      await user.click(screen.getByRole('menuitemradio', { name: 'Primary key' }));
+
+      expect(findAttribute(store().document.model, attribute)?.identifier).toBe('key');
+      expect(findAttribute(store().document.model, second)?.identifier).toBe('key');
+    });
+
+    it('refuses a key for all when one attribute sits on a relationship', async () => {
+      const user = userEvent.setup();
+      const { attribute, relationshipAttribute } = seed();
+      select(attribute, relationshipAttribute);
+      renderMenu();
+
+      await user.click(screen.getByRole('menuitemradio', { name: 'Primary key' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent(/only an entity attribute/i);
+      expect(findAttribute(store().document.model, attribute)?.identifier).toBe('none');
+    });
+
+    it('shows an option as set only when it is set on all of them', () => {
+      const { entity } = seed();
+      const other = store().addEntityAt({ x: 0, y: 300 });
+      act(() => {
+        store().setEntityKind(entity, 'weak');
+      });
+      select(entity, other);
+      renderMenu();
+
+      expect(screen.getByRole('menuitemradio', { name: 'Weak' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+      expect(screen.getByRole('menuitemradio', { name: 'Regular' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      );
+    });
+
+    it('deletes every selected component', async () => {
+      const user = userEvent.setup();
+      const { entity, attribute, relationshipAttribute } = seed();
+      select(attribute, relationshipAttribute);
+      renderMenu();
+
+      await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+
+      expect(store().document.model.attributes).toEqual([]);
+      expect(findEntity(store().document.model, entity)).toBeDefined();
+      expect(useUiStore.getState().selectedIds).toEqual([]);
     });
   });
 
-  it('focuses the first item and moves with the arrow keys', async () => {
+  it('moves between items with the arrow keys', async () => {
     const user = userEvent.setup();
     const { entity } = seed();
     openOn(entity);
     renderMenu();
 
     const rename = screen.getByRole('menuitem', { name: 'Rename' });
-    await waitFor(() => {
-      expect(rename).toHaveFocus();
+    act(() => {
+      rename.focus();
     });
 
     await user.keyboard('{ArrowDown}');
@@ -303,7 +389,7 @@ describe('ComponentMenu foreign key toggle', () => {
     setIdGenerator(sequentialIdGenerator('f'));
     useDocumentStore.setState({ document: createEmptyDocument() });
     useDocumentStore.temporal.getState().clear();
-    useUiStore.setState({ contextMenu: null, notice: null, renamingId: null, selectedIds: [] });
+    useUiStore.setState({ notice: null, renamingId: null, selectedIds: [] });
     return () => {
       resetIdGenerator();
     };

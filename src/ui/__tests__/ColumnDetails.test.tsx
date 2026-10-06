@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ColumnPanel } from '../ColumnPanel';
 import { ComponentMenu } from '../ComponentMenu';
 import { messages } from '../../i18n/messages.en';
 import { createColumnSpec } from '../../model/column';
@@ -43,63 +42,43 @@ function seed(): Seed {
 
 function openOn(elementId: Id): void {
   act(() => {
-    useUiStore.getState().openColumnPanel({ elementId, x: 100, y: 60 });
+    useUiStore.getState().setSelectedIds([elementId]);
   });
 }
 
 function panel(): HTMLElement {
-  return screen.getByRole('dialog');
+  return screen.getByRole('region');
 }
 
-describe('ColumnPanel', () => {
+describe('ColumnDetails', () => {
   beforeEach(() => {
     setIdGenerator(sequentialIdGenerator('c'));
     useDocumentStore.setState({ document: createEmptyDocument() });
     useDocumentStore.temporal.getState().clear();
-    useUiStore.setState({ contextMenu: null, columnPanel: null, notice: null });
+    useUiStore.setState({
+      selectedIds: [],
+      relationshipMode: { active: false, firstEntityId: null },
+      notice: null,
+    });
     return () => {
       resetIdGenerator();
     };
   });
 
-  it('shows nothing until it is opened on an attribute', () => {
-    const { book } = seed();
-    render(<ColumnPanel />);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  it('shows only for an attribute, in the sidebar', () => {
+    const { book, title } = seed();
+    render(<ComponentMenu />);
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
     openOn(book);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
-
-  it('is opened from the attribute’s right-click menu, where the menu was', async () => {
-    const { title } = seed();
-    render(
-      <>
-        <ComponentMenu />
-        <ColumnPanel />
-      </>,
-    );
-    act(() => {
-      useUiStore.getState().openContextMenu({ elementId: title, x: 140, y: 90 });
-    });
-
-    await userEvent.click(screen.getByRole('menuitem', { name: messages.menu.columnDetails }));
-
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expect(panel()).toHaveAccessibleName(text.title('title'));
-    expect(useUiStore.getState().columnPanel).toEqual({ elementId: title, x: 140, y: 90 });
-  });
-
-  it('opens with the type focused and says the details are for SQL only', () => {
-    const { title } = seed();
-    render(<ColumnPanel />);
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
     openOn(title);
-    expect(screen.getByRole('combobox', { name: text.type })).toHaveFocus();
+    expect(panel()).toHaveAccessibleName(text.title('title'));
     expect(screen.getByText(text.hint)).toBeInTheDocument();
   });
 
   it('applies the whole form as one undo entry', async () => {
     const { title } = seed();
-    render(<ColumnPanel />);
+    render(<ComponentMenu />);
     openOn(title);
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: text.type }), 'VARCHAR');
@@ -118,12 +97,13 @@ describe('ColumnPanel', () => {
       defaultValue: 'Untitled',
     });
     expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(1);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // The form now shows what was stored.
+    expect(screen.getByRole('combobox', { name: text.type })).toHaveValue('VARCHAR');
   });
 
   it('shows only the fields the chosen type uses', async () => {
     const { title } = seed();
-    render(<ColumnPanel />);
+    render(<ComponentMenu />);
     openOn(title);
     const type = screen.getByRole('combobox', { name: text.type });
 
@@ -141,7 +121,7 @@ describe('ColumnPanel', () => {
 
   it('refuses a length that is not a whole number, and keeps the form open', async () => {
     const { title } = seed();
-    render(<ColumnPanel />);
+    render(<ComponentMenu />);
     openOn(title);
 
     await userEvent.selectOptions(screen.getByRole('combobox', { name: text.type }), 'CHAR');
@@ -157,7 +137,7 @@ describe('ColumnPanel', () => {
 
   it('shows a key as always NOT NULL', () => {
     const { isbn } = seed();
-    render(<ColumnPanel />);
+    render(<ComponentMenu />);
     openOn(isbn);
     const notNull = screen.getByRole('checkbox', { name: new RegExp(text.notNull) });
     expect(notNull).toBeChecked();
@@ -167,7 +147,7 @@ describe('ColumnPanel', () => {
 
   it('offers the referenced entity only on a foreign key', async () => {
     const { title, publisher } = seed();
-    render(<ColumnPanel />);
+    render(<ComponentMenu />);
     openOn(title);
     expect(screen.queryByRole('combobox', { name: text.references })).not.toBeInTheDocument();
     expect(screen.getByText(text.referencesHint)).toBeInTheDocument();
@@ -190,7 +170,7 @@ describe('ColumnPanel', () => {
     const name = store().addAttributeTo(book);
     store().setAttributeShape(name, 'composite');
     store().addAttributeTo(name);
-    render(<ColumnPanel />);
+    render(<ComponentMenu />);
 
     openOn(age);
     expect(panel()).toHaveTextContent(text.derived);
@@ -200,23 +180,16 @@ describe('ColumnPanel', () => {
     expect(panel()).toHaveTextContent(text.composite);
   });
 
-  it('closes without changing anything on Cancel, Escape or a click elsewhere', async () => {
-    const { title } = seed();
-    render(<ColumnPanel />);
+  it('drops an unapplied draft when another component is selected', async () => {
+    const { book, title } = seed();
+    render(<ComponentMenu />);
 
     openOn(title);
     await userEvent.selectOptions(screen.getByRole('combobox', { name: text.type }), 'INT');
-    await userEvent.click(screen.getByRole('button', { name: messages.dialog.cancel }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
+    openOn(book);
     openOn(title);
-    await userEvent.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    openOn(title);
-    fireEvent.pointerDown(document.body);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
+    expect(screen.getByRole('combobox', { name: text.type })).toHaveValue('');
     expect(columnOf(title)).toEqual(createColumnSpec());
   });
 
@@ -227,7 +200,7 @@ describe('ColumnPanel', () => {
       seen.push(event.key);
     };
     globalThis.addEventListener('keydown', listener);
-    render(<ColumnPanel />);
+    render(<ComponentMenu />);
     openOn(title);
 
     await userEvent.type(screen.getByRole('textbox', { name: text.defaultValue }), 'e');

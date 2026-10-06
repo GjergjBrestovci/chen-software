@@ -102,8 +102,6 @@ export function Canvas(): ReactElement {
   const notify = useUiStore((state) => state.notify);
   const theme = useUiStore((state) => state.theme);
   const toggleTheme = useUiStore((state) => state.toggleTheme);
-  const openContextMenu = useUiStore((state) => state.openContextMenu);
-  const closeContextMenu = useUiStore((state) => state.closeContextMenu);
   const openExportDialog = useUiStore((state) => state.openExportDialog);
   const openSqlDialog = useUiStore((state) => state.openSqlDialog);
 
@@ -228,14 +226,6 @@ export function Canvas(): ReactElement {
       cancelRelationshipMode();
     },
     [armRelationshipFrom, cancelRelationshipMode, createRelationship, notify, relationshipMode],
-  );
-
-  const onNodeContextMenu = useCallback(
-    (event: ReactMouseEvent, node: AppNode) => {
-      event.preventDefault();
-      openContextMenu({ elementId: node.id, x: event.clientX, y: event.clientY });
-    },
-    [openContextMenu],
   );
 
   const onNodeDoubleClick = useCallback(
@@ -372,12 +362,14 @@ export function Canvas(): ReactElement {
     stopRenaming();
   }, [remove, selectedIds, setSelectedIds, stopRenaming]);
 
+  // Escape backs out one step: relationship mode first, then the selection.
   const onEscape = useCallback(() => {
-    closeContextMenu();
     if (relationshipMode.active) {
       cancelRelationshipMode();
+    } else {
+      setSelectedIds([]);
     }
-  }, [cancelRelationshipMode, closeContextMenu, relationshipMode.active]);
+  }, [cancelRelationshipMode, relationshipMode.active, setSelectedIds]);
 
   useKeyboardShortcuts(
     useMemo(
@@ -422,8 +414,6 @@ export function Canvas(): ReactElement {
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
-        onNodeContextMenu={onNodeContextMenu}
-        onPaneClick={closeContextMenu}
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
         connectionMode={ConnectionMode.Loose}
