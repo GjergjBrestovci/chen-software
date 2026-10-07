@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ReactFlowProvider } from '@xyflow/react';
@@ -13,6 +13,16 @@ import { useDocumentStore } from '../../store/documentStore';
 import { useUiStore } from '../../store/uiStore';
 
 installReactFlowEnvironment();
+
+/**
+ * The canvas restores and writes the autosave, and jsdom has no IndexedDB. An
+ * empty store keeps every test starting from the document it sets up.
+ */
+vi.mock('idb-keyval', () => ({
+  get: () => Promise.resolve(undefined),
+  set: () => Promise.resolve(),
+  del: () => Promise.resolve(),
+}));
 
 const model = (): ReturnType<typeof useDocumentStore.getState>['document']['model'] =>
   useDocumentStore.getState().document.model;
