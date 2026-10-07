@@ -17,7 +17,7 @@
     "verify:sql": "bash scripts/verify-sql.sh"
   },
   "dependencies": {
-    "@xyflow/react": "^12.11.6",
+    "@xyflow/react": "^12.12.0",
     "idb-keyval": "^6.3.0",
     "immer": "^10.2.0",
     "jspdf": "^4.2.1",
@@ -34,7 +34,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.4",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^5.2.0",
@@ -43,11 +43,11 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
-    "globals": "^17.12.0",
+    "globals": "^17.13.0",
     "jsdom": "^26.1.0",
-    "prettier": "^3.9.8",
+    "prettier": "^3.9.9",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.70.1",
+    "typescript-eslint": "^8.71.0",
     "vite": "^7.3.6",
     "vitest": "^3.2.7"
   },
