@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 15
     steps:
       # Actions are pinned to commit SHAs so a moved tag cannot change what
-      # runs; Dependabot keeps the pins current.
+      # runs. The comment names the release; bump both together.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -24,8 +24,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Only runtime dependencies end up on the site. Dev tooling is left to
-      # Dependabot rather than blocking every deploy.
+      # Only runtime dependencies end up on the site, so an advisory in dev
+      # tooling does not block a deploy.
       - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npm run format:check
