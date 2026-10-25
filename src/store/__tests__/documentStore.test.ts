@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetIdGenerator, sequentialIdGenerator, setIdGenerator } from '../../model/ids';
 import { createEmptyDocument } from '../../model/operations';
-import { findAttribute, findEntity, findRelationship } from '../../model/queries';
+import {
+  findAttribute,
+  findEntity,
+  findRelationship,
+  findSpecialization,
+} from '../../model/queries';
 import { loadDocument, useDocumentStore } from '../documentStore';
 
 function reset(): void {
@@ -311,6 +316,80 @@ describe('documentStore setTitle', () => {
   it('records nothing when the title is unchanged', () => {
     store().setTitle(store().document.title);
     expect(pastLength()).toBe(0);
+  });
+});
+
+describe('specialization actions', () => {
+  /** PERSON above, STUDENT and TEACHER below: the split parts of the zoo. */
+  function three(): { person: string; student: string; teacher: string } {
+    const person = store().addEntityAt({ x: 200, y: 0 });
+    const student = store().addEntityAt({ x: 0, y: 300 });
+    const teacher = store().addEntityAt({ x: 400, y: 300 });
+    return { person, student, teacher };
+  }
+
+  it('builds a specialization from a chosen superclass and places its triangle', () => {
+    const { person, student, teacher } = three();
+    const isa = store().addSpecializationFrom(person, [student, teacher]);
+
+    const spec = findSpecialization(store().document.model, isa);
+    expect(spec).toMatchObject({ superId: person, subIds: [student, teacher] });
+    expect(spec?.coverage).toBe('partial');
+    expect(spec?.overlap).toBe('disjoint');
+    expect(store().document.layout.positions[isa]).toBeDefined();
+  });
+
+  it('attaches and detaches subclasses as single undo steps', () => {
+    const { person, student, teacher } = three();
+    const advisor = store().addEntityAt({ x: 800, y: 300 });
+    const isa = store().addSpecializationFrom(person, [student, teacher]);
+
+    const before = pastLength();
+    store().attachSpecializationSub(isa, advisor);
+    expect(findSpecialization(store().document.model, isa)?.subIds).toEqual([
+      student,
+      teacher,
+      advisor,
+    ]);
+    expect(pastLength()).toBe(before + 1);
+
+    store().detachSpecializationSub(isa, advisor);
+    expect(findSpecialization(store().document.model, isa)?.subIds).toEqual([student, teacher]);
+    expect(pastLength()).toBe(before + 2);
+  });
+
+  it('refuses to detach the third subclass from a two-way split', () => {
+    const { person, student, teacher } = three();
+    const isa = store().addSpecializationFrom(person, [student, teacher]);
+    expect(() => {
+      store().detachSpecializationSub(isa, student);
+    }).toThrow();
+  });
+
+  it('flips coverage and overlap as one undo step each', () => {
+    const { person, student, teacher } = three();
+    const isa = store().addSpecializationFrom(person, [student, teacher]);
+
+    store().setSpecializationCoverage(isa, 'total');
+    store().setSpecializationOverlap([isa], 'non-disjoint');
+    const spec = findSpecialization(store().document.model, isa);
+    expect(spec).toMatchObject({ coverage: 'total', overlap: 'non-disjoint' });
+  });
+
+  it('ignores renames aimed at a specialization instead of throwing', () => {
+    const { person, student, teacher } = three();
+    const isa = store().addSpecializationFrom(person, [student, teacher]);
+    const before = pastLength();
+    store().rename(isa, 'oops');
+    expect(findSpecialization(store().document.model, isa)).toBeDefined();
+    expect(pastLength()).toBe(before);
+  });
+
+  it('is one undo entry per specialization action', () => {
+    const { person, student, teacher } = three();
+    const before = pastLength();
+    store().addSpecializationFrom(person, [student, teacher]);
+    expect(pastLength()).toBe(before + 1);
   });
 });
 
