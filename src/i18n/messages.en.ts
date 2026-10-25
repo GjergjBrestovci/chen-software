@@ -120,6 +120,8 @@ export const messages = {
       `Two tables would be called ${wanted}, so one became ${name}.`,
     missingCardinality: (relationship: string, entity: string): string =>
       `${relationship} has no cardinality on the ${entity} end, so it was treated as many.`,
+    isaConstraints: (entity: string, constraints: string): string =>
+      `${entity} is split into subclasses ${constraints}, but MySQL cannot enforce those constraints on the subclass tables.`,
     derivedLeftOut: (attribute: string, table: string): string =>
       `${attribute} in ${table} is derived, so it has no column.`,
     generatedPrimaryKey: (entity: string): string =>

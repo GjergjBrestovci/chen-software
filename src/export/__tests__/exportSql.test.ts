@@ -121,6 +121,7 @@ describe('buildSql', () => {
     ['bookstore', () => fixture('bookstore'), { dropExisting: true }],
     ['bookstore-broken', () => fixture('bookstore-broken'), DEFAULT_SQL_OPTIONS],
     ['university', () => fixture('university'), DEFAULT_SQL_OPTIONS],
+    ['zoo', () => fixture('zoo'), { dropExisting: true }],
     ['edge-cases', edgeCases, { dropExisting: true }],
   ])('writes %s exactly as fixtures/sql records it', (name, document, options) => {
     expectMatchesFile(name, buildSql(document(), options).sql);

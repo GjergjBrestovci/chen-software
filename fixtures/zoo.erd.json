@@ -1,0 +1,199 @@
+{
+  "version": 4,
+  "title": "Zoo",
+  "model": {
+    "entities": [
+      {
+        "id": "ent_animal",
+        "name": "ANIMAL",
+        "kind": "regular"
+      },
+      {
+        "id": "ent_mammal",
+        "name": "MAMMAL",
+        "kind": "regular"
+      },
+      {
+        "id": "ent_bird",
+        "name": "BIRD",
+        "kind": "regular"
+      },
+      {
+        "id": "ent_carnivore",
+        "name": "CARNIVORE",
+        "kind": "regular"
+      },
+      {
+        "id": "ent_herbivore",
+        "name": "HERBIVORE",
+        "kind": "regular"
+      }
+    ],
+    "attributes": [
+      {
+        "id": "at_animal_id",
+        "ownerId": "ent_animal",
+        "ownerKind": "entity",
+        "name": "animal_id",
+        "shape": "simple",
+        "identifier": "key",
+        "foreignKey": false,
+        "column": {
+          "type": "INT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": null,
+          "references": null
+        }
+      },
+      {
+        "id": "at_animal_name",
+        "ownerId": "ent_animal",
+        "ownerKind": "entity",
+        "name": "name",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 100,
+          "precision": null,
+          "scale": null,
+          "notNull": true,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
+      },
+      {
+        "id": "at_mammal_gestation",
+        "ownerId": "ent_mammal",
+        "ownerKind": "entity",
+        "name": "gestation_days",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false,
+        "column": {
+          "type": "SMALLINT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
+      },
+      {
+        "id": "at_bird_wingspan",
+        "ownerId": "ent_bird",
+        "ownerKind": "entity",
+        "name": "wingspan_cm",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false,
+        "column": {
+          "type": "SMALLINT",
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
+      },
+      {
+        "id": "at_carnivore_teeth",
+        "ownerId": "ent_carnivore",
+        "ownerKind": "entity",
+        "name": "teeth_type",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 50,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
+      },
+      {
+        "id": "at_herbivore_browse",
+        "ownerId": "ent_herbivore",
+        "ownerKind": "entity",
+        "name": "browse",
+        "shape": "simple",
+        "identifier": "none",
+        "foreignKey": false,
+        "column": {
+          "type": "VARCHAR",
+          "length": 50,
+          "precision": null,
+          "scale": null,
+          "notNull": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": null,
+          "references": null
+        }
+      }
+    ],
+    "relationships": [],
+    "specializations": [
+      {
+        "id": "isa_animal",
+        "superId": "ent_animal",
+        "subIds": ["ent_mammal", "ent_bird"],
+        "coverage": "total",
+        "overlap": "disjoint"
+      },
+      {
+        "id": "isa_mammal",
+        "superId": "ent_mammal",
+        "subIds": ["ent_carnivore", "ent_herbivore"],
+        "coverage": "partial",
+        "overlap": "disjoint"
+      }
+    ]
+  },
+  "layout": {
+    "positions": {
+      "ent_animal": { "x": 200, "y": 0 },
+      "at_animal_id": { "x": -180, "y": -120 },
+      "at_animal_name": { "x": 140, "y": -120 },
+      "isa_animal": { "x": 230, "y": 130 },
+      "ent_mammal": { "x": 40, "y": 270 },
+      "at_mammal_gestation": { "x": -220, "y": 120 },
+      "ent_bird": { "x": 440, "y": 270 },
+      "at_bird_wingspan": { "x": 160, "y": 120 },
+      "isa_mammal": { "x": 70, "y": 400 },
+      "ent_carnivore": { "x": 20, "y": 540 },
+      "at_carnivore_teeth": { "x": -220, "y": 120 },
+      "ent_herbivore": { "x": 320, "y": 540 },
+      "at_herbivore_browse": { "x": 160, "y": 120 }
+    }
+  },
+  "presentation": {
+    "theme": {
+      "entity": null,
+      "relationship": null,
+      "attribute": null,
+      "specialization": null
+    },
+    "colors": {}
+  },
+  "dismissedHints": []
+}
