@@ -2,15 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { CARDINALITY_PLACEHOLDER, describeDiagram } from '../drawing';
 import type { Drawing, DrawnShape } from '../drawing';
-import { boundsOf, distance, unionBounds } from '../../geometry';
+import { boundsOf, distance, shapeSizeFor, unionBounds } from '../../geometry';
 import {
   addAttribute,
   addEntity,
   addRelationship,
+  addSpecialization,
   createEmptyDocument,
+  deleteElements,
   setAttributeForeignKey,
   setElementColor,
 } from '../../model/operations';
+import type { Specialization } from '../../model/types';
 import { createColumnSpec } from '../../model/column';
 import { readDocumentJson } from '../../persistence/migrations';
 import type { ErDocument } from '../../model/types';
@@ -199,5 +202,81 @@ describe('describeDiagram edge cases', () => {
     const withColour = setElementColor(base, 'a', '#dc2626');
     const drawing = describeDiagram(withColour);
     expect(shapeFor(drawing, 'a').color).toBe('#dc2626');
+  });
+});
+
+describe('describeDiagram with a specialization', () => {
+  const triangleSize = shapeSizeFor('triangle', 'ISA');
+
+  function zoo(overrides: Partial<Specialization> = {}): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'person', name: 'PERSON', position: { x: 100, y: 0 } });
+    document = addEntity(document, { id: 'student', name: 'STUDENT', position: { x: 0, y: 300 } });
+    document = addEntity(document, {
+      id: 'teacher',
+      name: 'TEACHER',
+      position: { x: 400, y: 300 },
+    });
+    return addSpecialization(document, {
+      id: 'isa',
+      superId: 'person',
+      subIds: ['student', 'teacher'],
+      coverage: overrides.coverage ?? 'partial',
+      overlap: overrides.overlap ?? 'disjoint',
+      position: { x: 150, y: 140 },
+    });
+  }
+
+  it('draws the triangle with the fixed word and no double outline', () => {
+    const drawing = describeDiagram(zoo());
+    const shape = shapeFor(drawing, 'isa');
+    expect(shape.kind).toBe('specialization');
+    expect(shape.name).toBe('ISA');
+    expect(shape.inner).toBeNull();
+    expect(shape.dashed).toBe(false);
+    expect(shape.box.kind).toBe('triangle');
+    expect(shape.box.size).toEqual(triangleSize);
+  });
+
+  it('links the superclass and each subclass to the triangle', () => {
+    const drawing = describeDiagram(zoo());
+    const before = describeDiagram(deleteElements(zoo(), ['isa'])).lines.length;
+    // One line to the superclass and one per subclass; the triangle's own
+    // shape adds nothing.
+    expect(drawing.lines).toHaveLength(before + 3);
+  });
+
+  it('floats the constraint text above the apex, always drawn', () => {
+    const drawing = describeDiagram(zoo());
+    const isaLabels = drawing.labels.filter((label) => label.kind === 'isa');
+    expect(isaLabels).toHaveLength(1);
+    const label = isaLabels[0];
+    if (!label) throw new Error('no isa label');
+    expect(label.text).toBe('(p,d)');
+    expect(label.unset).toBe(false);
+    const triangle = shapeFor(drawing, 'isa').box;
+    expect(label.position.x).toBeCloseTo(triangle.center.x, 6);
+    expect(label.position.y).toBeLessThan(triangle.center.y - triangle.size.height / 2);
+  });
+
+  it('writes all four constraint combinations', () => {
+    const cases = [
+      [{ coverage: 'total' as const, overlap: 'disjoint' as const }, '(t,d)'],
+      [{ coverage: 'total' as const, overlap: 'non-disjoint' as const }, '(t,nd)'],
+      [{ coverage: 'partial' as const, overlap: 'disjoint' as const }, '(p,d)'],
+      [{ coverage: 'partial' as const, overlap: 'non-disjoint' as const }, '(p,nd)'],
+    ] as const;
+    for (const [flags, text] of cases) {
+      const drawing = describeDiagram(zoo(flags));
+      expect(drawing.labels.find((l) => l.kind === 'isa')?.text).toBe(text);
+    }
+  });
+
+  it('keeps the floating text inside the drawing bounds', () => {
+    const drawing = describeDiagram(zoo());
+    const label = drawing.labels.find((l) => l.kind === 'isa');
+    if (!label) throw new Error('no isa label');
+    if (!drawing.bounds) throw new Error('no bounds');
+    expect(drawing.bounds.minY).toBeLessThanOrEqual(label.position.y - 8);
   });
 });

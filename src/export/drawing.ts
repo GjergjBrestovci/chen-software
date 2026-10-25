@@ -1,6 +1,7 @@
 import {
   CARDINALITY_FONT_SIZE,
   DOUBLE_LINE_GAP,
+  ISA_FONT_SIZE,
   MARKER_SIZE,
   ROLE_FONT_SIZE,
   boundsOf,
@@ -19,7 +20,9 @@ import {
 } from '../geometry';
 import type { Bounds, EdgeSegment, Point, ShapeBox } from '../geometry';
 import { absoluteBoxes } from '../layout/boxes';
+import { messages } from '../i18n/messages.en';
 import { colorFor } from '../model/presentation';
+import { isaConstraintText } from '../model/queries';
 import type { Attribute, Color, ElementKind, ErDocument, Id } from '../model/types';
 
 /**
@@ -53,7 +56,7 @@ export interface DrawnShape {
 }
 
 export interface DrawnLabel {
-  kind: 'cardinality' | 'role';
+  kind: 'cardinality' | 'role' | 'isa';
   text: string;
   /** Centre of the text. */
   position: Point;
@@ -64,7 +67,7 @@ export interface DrawnLabel {
 
 export interface Drawing {
   shapes: DrawnShape[];
-  /** Every line: attribute links, and relationship ends (a total end contributes two). */
+  /** Every line: attribute links, ISA links, and relationship ends (a total end contributes two). */
   lines: EdgeSegment[];
   labels: DrawnLabel[];
   /** Everything that gets ink, or `null` for an empty diagram. */
@@ -72,6 +75,9 @@ export interface Drawing {
 }
 
 export const CARDINALITY_PLACEHOLDER = '?';
+
+/** How far the constraint text floats above the triangle's apex. */
+const ISA_LABEL_CLEARANCE = 8;
 
 function underlineFor(attribute: Attribute | undefined): Underline {
   if (attribute?.identifier === 'key') return 'solid';
@@ -142,6 +148,39 @@ export function describeDiagram(document: ErDocument): Drawing {
   for (const entity of model.entities) {
     shape(entity.id, 'entity', entity.name, entity.kind === 'weak');
   }
+
+  for (const spec of model.specializations) {
+    shape(spec.id, 'specialization', messages.element.specialization, false);
+
+    const triangle = boxes.get(spec.id);
+    if (!triangle) {
+      continue;
+    }
+    const superBox = boxes.get(spec.superId);
+    if (superBox) {
+      lines.push(floatingEdge(superBox, triangle));
+    }
+    for (const subId of spec.subIds) {
+      const subBox = boxes.get(subId);
+      if (subBox) {
+        lines.push(floatingEdge(triangle, subBox));
+      }
+    }
+
+    // The course's constraint text floats above the apex and is always drawn:
+    // an ISA node without (t,d) etc. is not a full statement of the split.
+    labels.push({
+      kind: 'isa',
+      text: isaConstraintText(spec.coverage, spec.overlap),
+      position: {
+        x: triangle.center.x,
+        y: triangle.center.y - triangle.size.height / 2 - ISA_LABEL_CLEARANCE,
+      },
+      fontSize: ISA_FONT_SIZE,
+      unset: false,
+    });
+  }
+
   for (const relationship of model.relationships) {
     shape(relationship.id, 'relationship', relationship.name, relationship.kind === 'identifying');
   }

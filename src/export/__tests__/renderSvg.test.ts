@@ -7,6 +7,7 @@ import { FILL_OPACITY } from '../../model/presentation';
 import {
   addAttribute,
   addEntity,
+  addSpecialization,
   createEmptyDocument,
   setElementColor,
 } from '../../model/operations';
@@ -33,6 +34,42 @@ function parse(svg: string): SVGSVGElement {
 function texts(root: Element): string[] {
   return [...root.querySelectorAll('text')].map((node) => node.textContent);
 }
+
+describe('renderSvg of a specialization', () => {
+  function zoo(): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'person', name: 'PERSON', position: { x: 100, y: 0 } });
+    document = addEntity(document, { id: 'student', name: 'STUDENT', position: { x: 0, y: 300 } });
+    document = addEntity(document, {
+      id: 'teacher',
+      name: 'TEACHER',
+      position: { x: 400, y: 300 },
+    });
+    return addSpecialization(document, {
+      id: 'isa',
+      superId: 'person',
+      subIds: ['student', 'teacher'],
+      position: { x: 150, y: 140 },
+    });
+  }
+
+  it('paints the triangle as a polygon and writes the constraint text', () => {
+    const rendered = renderSvg(describeDiagram(zoo()));
+    const root = parse(rendered.svg);
+    expect(texts(root)).toContain('(p,d)');
+
+    const polygons = [...root.querySelectorAll('polygon')];
+    // A triangle has three corners; the diamond has four.
+    const triangle = polygons.find(
+      (polygon) => (polygon.getAttribute('points')?.trim().split(/\s+/).length ?? 0) === 3,
+    );
+    expect(triangle).toBeDefined();
+  });
+
+  it('stays well-formed with the floating label above the shape', () => {
+    expect(() => renderSvg(describeDiagram(zoo()))).not.toThrow();
+  });
+});
 
 describe('renderSvg', () => {
   const drawing = describeDiagram(university());

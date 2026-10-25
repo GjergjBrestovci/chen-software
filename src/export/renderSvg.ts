@@ -141,7 +141,10 @@ function labelMarkup(label: DrawnLabel): string {
   const style =
     label.kind === 'cardinality'
       ? `font-weight="bold" fill="${INK}"`
-      : `font-style="italic" fill="${ROLE_INK}"`;
+      : label.kind === 'role'
+        ? `font-style="italic" fill="${ROLE_INK}"`
+        : // The (t,d) text is notation: upright ink, like the shapes it names.
+          `fill="${INK}"`;
   return `<text x="${n(label.position.x)}" y="${n(baseline)}" font-family="${FONT_FAMILY}" font-size="${n(label.fontSize)}" text-anchor="middle" ${style}>${escapeXml(label.text)}</text>`;
 }
 
