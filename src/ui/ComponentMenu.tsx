@@ -3,7 +3,15 @@ import { ColumnDetails } from './ColumnDetails';
 import { MenuGroup, MenuItem, MenuPanel } from './MenuPanel';
 import { messages } from '../i18n/messages.en';
 import { COLOR_PALETTE, hasColorOverride } from '../model/presentation';
-import { findAttribute, findElementRef, findEntity, findRelationship } from '../model/queries';
+import { MIN_SPECIALIZATION_SUBS } from '../model/operations';
+import {
+  canSpecialize,
+  findAttribute,
+  findElementRef,
+  findEntity,
+  findRelationship,
+  findSpecialization,
+} from '../model/queries';
 import type {
   Attribute,
   AttributeIdentifier,
@@ -12,6 +20,7 @@ import type {
   ErDocument,
   Id,
   Relationship,
+  Specialization,
 } from '../model/types';
 import { useDocumentStore } from '../store/documentStore';
 import { useUiStore } from '../store/uiStore';
@@ -75,6 +84,123 @@ function EntitySection({ ids, items }: SectionProps<Entity>): ReactElement {
         />
       ))}
     </MenuGroup>
+  );
+}
+
+/**
+ * What a chosen selection can split into: every selected entity that could
+ * legally be the superclass, by the model's own eligibility rules.
+ */
+function SpecializationFromSelection({
+  document,
+  ids,
+  items,
+}: SectionProps<Entity>): ReactElement | null {
+  const addSpecializationFrom = useDocumentStore((state) => state.addSpecializationFrom);
+  const notify = useUiStore((state) => state.notify);
+  const setSelectedIds = useUiStore((state) => state.setSelectedIds);
+
+  // A split is one superclass plus two subclasses: fewer selections cannot.
+  if (items.length < MIN_SPECIALIZATION_SUBS + 1) {
+    return null;
+  }
+
+  return (
+    <MenuGroup label={messages.menu.specialization}>
+      {items.map((entity) => {
+        const others = ids.filter((id) => id !== entity.id);
+        return (
+          <MenuItem
+            key={entity.id}
+            label={entity.name.trim().length > 0 ? entity.name : messages.element.unnamed}
+            onSelect={() => {
+              if (!canSpecialize(document.model, entity.id, others)) {
+                notify(messages.menu.specializationNotPossible);
+                return;
+              }
+              // The new triangle takes the selection, so its own menu opens.
+              setSelectedIds([addSpecializationFrom(entity.id, others)]);
+            }}
+          />
+        );
+      })}
+    </MenuGroup>
+  );
+}
+
+function SpecializationSection({
+  document,
+  ids,
+  items,
+}: SectionProps<Specialization>): ReactElement {
+  const setSpecializationCoverage = useDocumentStore((state) => state.setSpecializationCoverage);
+  const setSpecializationOverlap = useDocumentStore((state) => state.setSpecializationOverlap);
+  const detachSpecializationSub = useDocumentStore((state) => state.detachSpecializationSub);
+  const notify = useUiStore((state) => state.notify);
+
+  const [onlyId] = ids;
+  const single = ids.length === 1 ? onlyId : undefined;
+  // Subclasses can only be listed for exactly one node.
+  const node = single === undefined ? undefined : items[0];
+
+  return (
+    <>
+      <MenuGroup label={messages.menu.coverage}>
+        {(['partial', 'total'] as const).map((coverage) => (
+          <MenuItem
+            key={coverage}
+            label={coverage === 'total' ? messages.menu.total : messages.menu.partial}
+            pressed={all(
+              items.map((spec) => spec.coverage),
+              coverage,
+            )}
+            onSelect={() => {
+              setSpecializationCoverage(ids, coverage);
+            }}
+          />
+        ))}
+      </MenuGroup>
+
+      <MenuGroup label={messages.menu.overlap}>
+        {(['disjoint', 'non-disjoint'] as const).map((overlap) => (
+          <MenuItem
+            key={overlap}
+            label={overlap === 'disjoint' ? messages.menu.disjoint : messages.menu.nonDisjoint}
+            pressed={all(
+              items.map((spec) => spec.overlap),
+              overlap,
+            )}
+            onSelect={() => {
+              setSpecializationOverlap(ids, overlap);
+            }}
+          />
+        ))}
+      </MenuGroup>
+
+      {node !== undefined && (
+        <MenuGroup label={messages.menu.subclasses}>
+          {node.subIds.map((subId) => {
+            const sub = findEntity(document.model, subId);
+            const label =
+              sub !== undefined && sub.name.trim().length > 0 ? sub.name : messages.element.unnamed;
+            return (
+              <MenuItem
+                key={subId}
+                danger
+                label={label}
+                onSelect={() => {
+                  if (node.subIds.length <= MIN_SPECIALIZATION_SUBS) {
+                    notify(messages.menu.detachNeedsTwo);
+                    return;
+                  }
+                  detachSpecializationSub(node.id, subId);
+                }}
+              />
+            );
+          })}
+        </MenuGroup>
+      )}
+    </>
   );
 }
 
@@ -239,6 +365,7 @@ export function ComponentMenu(): ReactElement | null {
   const entities = allOf(ids, (id) => findEntity(model, id));
   const relationships = allOf(ids, (id) => findRelationship(model, id));
   const attributes = allOf(ids, (id) => findAttribute(model, id));
+  const specializations = allOf(ids, (id) => findSpecialization(model, id));
   const [onlyId] = ids;
   const single = ids.length === 1 ? onlyId : undefined;
   const singleAttribute = single === undefined ? undefined : attributes?.[0];
@@ -268,10 +395,14 @@ export function ComponentMenu(): ReactElement | null {
         </MenuGroup>
 
         {entities && <EntitySection document={document} ids={ids} items={entities} />}
+        {entities && <SpecializationFromSelection document={document} ids={ids} items={entities} />}
         {relationships && (
           <RelationshipSection document={document} ids={ids} items={relationships} />
         )}
         {attributes && <AttributeSection document={document} ids={ids} items={attributes} />}
+        {specializations && (
+          <SpecializationSection document={document} ids={ids} items={specializations} />
+        )}
 
         <ColourSection document={document} ids={ids} />
       </MenuPanel>

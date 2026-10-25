@@ -198,6 +198,16 @@ export const messages = {
     foreignKey: 'Foreign key',
     keysAreEntityOnly: 'Only an entity attribute can be a key.',
     compositeHasParts: 'Delete its parts before changing the shape.',
+    specialization: 'Specialization',
+    specializationNotPossible: 'Only plain entities that belong to no specialization can be split.',
+    detachNeedsTwo: 'A specialization must keep at least two subclasses.',
+    coverage: 'Coverage',
+    total: 'Total',
+    partial: 'Partial',
+    overlap: 'Overlap',
+    disjoint: 'Disjoint',
+    nonDisjoint: 'Non-disjoint',
+    subclasses: 'Subclasses',
   },
 
   /** The column panel: details only the SQL export uses. */

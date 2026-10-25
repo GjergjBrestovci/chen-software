@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ComponentMenu } from '../ComponentMenu';
@@ -7,7 +7,12 @@ import { Notice } from '../Notice';
 import { resetIdGenerator, sequentialIdGenerator, setIdGenerator } from '../../model/ids';
 import { createEmptyDocument } from '../../model/operations';
 import { colorFor, hasColorOverride } from '../../model/presentation';
-import { findAttribute, findEntity, findRelationship } from '../../model/queries';
+import {
+  findAttribute,
+  findEntity,
+  findRelationship,
+  findSpecialization,
+} from '../../model/queries';
 import type { Id } from '../../model/types';
 import { useDocumentStore } from '../../store/documentStore';
 import { useUiStore } from '../../store/uiStore';
@@ -426,5 +431,169 @@ describe('ComponentMenu foreign key toggle', () => {
     await user.click(screen.getByRole('menuitemcheckbox', { name: 'Foreign key' }));
 
     expect(findAttribute(store().document.model, attribute)?.foreignKey).toBe(false);
+  });
+});
+
+describe('specialization from a selection', () => {
+  beforeEach(() => {
+    setIdGenerator(sequentialIdGenerator('s'));
+    useDocumentStore.setState({ document: createEmptyDocument() });
+    useDocumentStore.temporal.getState().clear();
+    useUiStore.setState({
+      selectedIds: [],
+      renamingId: null,
+      relationshipMode: { active: false, firstEntityId: null },
+      notice: null,
+    });
+  });
+
+  afterEach(() => {
+    resetIdGenerator();
+  });
+
+  function threeEntities(): { person: Id; student: Id; teacher: Id } {
+    const person = store().addEntityAt({ x: 0, y: 0 });
+    const student = store().addEntityAt({ x: 0, y: 200 });
+    const teacher = store().addEntityAt({ x: 300, y: 200 });
+    act(() => {
+      store().rename(person, 'PERSON');
+      store().rename(student, 'STUDENT');
+      store().rename(teacher, 'TEACHER');
+    });
+    return { person, student, teacher };
+  }
+
+  function openAll(ids: Id[]): void {
+    act(() => {
+      useUiStore.getState().setSelectedIds(ids);
+    });
+  }
+
+  it('offers each selected entity as a superclass candidate', () => {
+    const { person, student, teacher } = threeEntities();
+    openAll([person, student, teacher]);
+    renderMenu();
+    for (const name of ['PERSON', 'STUDENT', 'TEACHER']) {
+      expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('hides the candidates below three selected entities', () => {
+    const { person, student } = threeEntities();
+    openAll([person, student]);
+    renderMenu();
+    expect(screen.queryByRole('group', { name: 'Specialization' })).not.toBeInTheDocument();
+  });
+
+  it('splits the chosen superclass and selects the new triangle', async () => {
+    const user = userEvent.setup();
+    const { person, student, teacher } = threeEntities();
+    openAll([person, student, teacher]);
+    renderMenu();
+
+    await user.click(screen.getByRole('menuitem', { name: 'PERSON' }));
+
+    const spec = store().document.model.specializations[0];
+    if (spec === undefined) {
+      throw new Error('the menu did not split anything');
+    }
+    expect(spec).toMatchObject({ superId: person, subIds: [student, teacher] });
+    expect(useUiStore.getState().selectedIds).toEqual([spec.id]);
+  });
+
+  it('notices instead of splitting when nothing in the selection is eligible', async () => {
+    const user = userEvent.setup();
+    const { person, student, teacher } = threeEntities();
+    act(() => {
+      store().addSpecializationFrom(person, [student, teacher]);
+    });
+    openAll([person, student, teacher]);
+    renderMenu();
+
+    await user.click(screen.getByRole('menuitem', { name: 'STUDENT' }));
+
+    expect(store().document.model.specializations).toHaveLength(1);
+    expect(screen.getByRole('status')).toHaveTextContent('specialization');
+  });
+});
+
+describe('specialization menu', () => {
+  beforeEach(() => {
+    setIdGenerator(sequentialIdGenerator('t'));
+    useDocumentStore.setState({ document: createEmptyDocument() });
+    useDocumentStore.temporal.getState().clear();
+    useUiStore.setState({
+      selectedIds: [],
+      renamingId: null,
+      relationshipMode: { active: false, firstEntityId: null },
+      notice: null,
+    });
+  });
+
+  afterEach(() => {
+    resetIdGenerator();
+  });
+
+  function isa(): { student: Id; teacher: Id; specId: Id } {
+    const person = store().addEntityAt({ x: 0, y: 0 });
+    const student = store().addEntityAt({ x: 0, y: 200 });
+    const teacher = store().addEntityAt({ x: 300, y: 200 });
+    act(() => {
+      store().rename(person, 'PERSON');
+      store().rename(student, 'STUDENT');
+      store().rename(teacher, 'TEACHER');
+    });
+    const specId = store().addSpecializationFrom(person, [student, teacher]);
+    return { student, teacher, specId };
+  }
+
+  it('shows the stored constraints and sets new ones', async () => {
+    const user = userEvent.setup();
+    const { specId } = isa();
+    openOn(specId);
+    renderMenu();
+
+    expect(screen.getByRole('menuitemradio', { name: 'Partial' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('menuitemradio', { name: 'Disjoint' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+
+    await user.click(screen.getByRole('menuitemradio', { name: 'Total' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'Non-disjoint' }));
+
+    const spec = findSpecialization(store().document.model, specId);
+    expect(spec).toMatchObject({ coverage: 'total', overlap: 'non-disjoint' });
+  });
+
+  it('lists the subclasses and detaches one once the node has three', async () => {
+    const user = userEvent.setup();
+    const { student, teacher, specId } = isa();
+    const advisor = store().addEntityAt({ x: 600, y: 200 });
+    act(() => {
+      store().rename(advisor, 'ADVISOR');
+      store().attachSpecializationSub(specId, advisor);
+    });
+
+    openOn(specId);
+    renderMenu();
+    await user.click(screen.getByRole('menuitem', { name: 'ADVISOR' }));
+
+    expect(findSpecialization(store().document.model, specId)?.subIds).toEqual([student, teacher]);
+  });
+
+  it('refuses to detach below two subclasses, with a notice', async () => {
+    const user = userEvent.setup();
+    const { student, teacher, specId } = isa();
+
+    openOn(specId);
+    renderMenu();
+    await user.click(screen.getByRole('menuitem', { name: 'STUDENT' }));
+
+    expect(findSpecialization(store().document.model, specId)?.subIds).toEqual([student, teacher]);
+    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 });
