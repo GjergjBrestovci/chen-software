@@ -4,7 +4,7 @@ import { shapeSizeFor } from '../sizing';
 import type { Point, ShapeBox, ShapeKind } from '../types';
 import { distance, normalize, subtract } from '../vectors';
 
-const KINDS: ShapeKind[] = ['rect', 'diamond', 'ellipse'];
+const KINDS: ShapeKind[] = ['rect', 'diamond', 'ellipse', 'triangle'];
 const CENTER: Point = { x: 100, y: 200 };
 
 function box(kind: ShapeKind, width = 120, height = 60): ShapeBox {
@@ -22,6 +22,11 @@ function outlineResidual(shape: ShapeBox, point: Point): number {
       return Math.abs(dx + dy - 1);
     case 'ellipse':
       return Math.abs(Math.hypot(dx, dy) - 1);
+    case 'triangle': {
+      // Apex up: the slanted sides tighten as they rise, the base is flat.
+      const sy = (point.y - shape.center.y) / (shape.size.height / 2);
+      return Math.abs(Math.max(2 * dx - sy, sy) - 1);
+    }
   }
 }
 

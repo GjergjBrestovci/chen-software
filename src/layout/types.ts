@@ -10,6 +10,8 @@ export function shapeKindFor(kind: ElementKind): ShapeKind {
       return 'diamond';
     case 'attribute':
       return 'ellipse';
+    case 'specialization':
+      return 'triangle';
   }
 }
 

@@ -21,7 +21,7 @@ export type EntityKind = 'regular' | 'weak';
 export type RelationshipKind = 'regular' | 'identifying';
 
 /** Discriminator for "what sort of thing is this id?" lookups. */
-export type ElementKind = 'entity' | 'relationship' | 'attribute';
+export type ElementKind = 'entity' | 'relationship' | 'attribute' | 'specialization';
 
 /** MySQL column types a student can choose for an attribute (SQL export only). */
 export type SqlType =

@@ -1,3 +1,4 @@
+import { messages } from '../i18n/messages.en';
 import type {
   Attribute,
   ElementKind,
@@ -25,6 +26,7 @@ export function findElementKind(model: ErModel, id: Id): ElementKind | undefined
   if (findEntity(model, id)) return 'entity';
   if (findRelationship(model, id)) return 'relationship';
   if (findAttribute(model, id)) return 'attribute';
+  if (findSpecialization(model, id)) return 'specialization';
   return undefined;
 }
 
@@ -47,12 +49,21 @@ export function findElementRef(model: ErModel, id: Id): ElementRef | undefined {
   const attribute = findAttribute(model, id);
   if (attribute) return { kind: 'attribute', name: attribute.name };
 
+  // The triangle carries no name; it is drawn with the fixed word ISA.
+  if (findSpecialization(model, id)) {
+    return { kind: 'specialization', name: messages.element.specialization };
+  }
+
   return undefined;
 }
 
 /** Display name of any element, or `undefined` if the id is unknown. */
 export function findElementName(model: ErModel, id: Id): string | undefined {
-  return (findEntity(model, id) ?? findRelationship(model, id) ?? findAttribute(model, id))?.name;
+  const named = findEntity(model, id) ?? findRelationship(model, id) ?? findAttribute(model, id);
+  if (named !== undefined) {
+    return named.name;
+  }
+  return findSpecialization(model, id) ? messages.element.specialization : undefined;
 }
 
 /** Attributes hanging off one entity or relationship, in model order. */

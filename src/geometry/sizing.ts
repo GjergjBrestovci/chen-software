@@ -35,6 +35,7 @@ export const SHAPE_METRICS: Readonly<Record<ShapeKind, ShapeMetrics>> = {
   rect: { fontSize: 14, paddingX: 20, paddingY: 14, minWidth: 120, minHeight: 56 },
   diamond: { fontSize: 13, paddingX: 10, paddingY: 8, minWidth: 130, minHeight: 74 },
   ellipse: { fontSize: 12, paddingX: 10, paddingY: 6, minWidth: 96, minHeight: 46 },
+  triangle: { fontSize: 11, paddingX: 6, paddingY: 4, minWidth: 64, minHeight: 44 },
 };
 
 /** Font size a shape kind draws its name at. */
@@ -50,6 +51,11 @@ function halfExtents(kind: ShapeKind, u: number, v: number): { a: number; b: num
       return { a: u * Math.SQRT2, b: v * Math.SQRT2 };
     case 'diamond':
       return { a: u / (1 - 1 / DIAMOND_HEIGHT_FACTOR), b: v * DIAMOND_HEIGHT_FACTOR };
+    case 'triangle':
+      // The binding corners of a centred text box are the upper ones, where
+      // the slanted sides have narrowed to half the base width; the topmost
+      // corner sits on the sides exactly at `a = 4u`, `b = 2v`.
+      return { a: 4 * u, b: 2 * v };
   }
 }
 

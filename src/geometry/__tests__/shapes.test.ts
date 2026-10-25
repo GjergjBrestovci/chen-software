@@ -5,7 +5,7 @@ import { distance } from '../vectors';
 
 const CENTER: Point = { x: 100, y: 200 };
 const SIZE = { width: 80, height: 40 };
-const KINDS: ShapeKind[] = ['rect', 'diamond', 'ellipse'];
+const KINDS: ShapeKind[] = ['rect', 'diamond', 'ellipse', 'triangle'];
 
 function box(kind: ShapeKind, size = SIZE): ShapeBox {
   return { kind, center: CENTER, size };
@@ -22,6 +22,11 @@ function outlineResidual(shape: ShapeBox, point: Point): number {
       return Math.abs(dx + dy - 1);
     case 'ellipse':
       return Math.abs(Math.hypot(dx, dy) - 1);
+    case 'triangle': {
+      // Apex up: the slanted sides tighten as they rise, the base is flat.
+      const sy = (point.y - shape.center.y) / (shape.size.height / 2);
+      return Math.abs(Math.max(2 * dx - sy, sy) - 1);
+    }
   }
 }
 
@@ -135,5 +140,22 @@ describe('containsPoint', () => {
 
   it.each(KINDS)('contains nothing when a %s has no area', (kind) => {
     expect(containsPoint(box(kind, { width: 0, height: 0 }), CENTER)).toBe(false);
+  });
+});
+
+describe('triangle specifics', () => {
+  it('meets an apex-up triangle at the apex, the base and the mid-width', () => {
+    const shape = box('triangle');
+    expect(boundaryPoint(shape, { x: CENTER.x, y: -1000 })).toEqual({ x: 100, y: 180 });
+    expect(boundaryPoint(shape, { x: CENTER.x, y: 1000 })).toEqual({ x: 100, y: 220 });
+    // Half the base width is available at mid-height.
+    expect(boundaryPoint(shape, { x: 1000, y: CENTER.y }).x).toBeCloseTo(120, 9);
+  });
+
+  it('keeps the bottom corners of its bounding box but not the top ones', () => {
+    const shape = box('triangle');
+    expect(containsPoint(shape, { x: CENTER.x + 40, y: CENTER.y + 20 })).toBe(true);
+    expect(containsPoint(shape, { x: CENTER.x + 40, y: CENTER.y - 20 })).toBe(false);
+    expect(containsPoint(shape, { x: CENTER.x, y: CENTER.y - 20 })).toBe(true);
   });
 });

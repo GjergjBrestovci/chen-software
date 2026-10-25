@@ -4,7 +4,7 @@ import { fontSizeFor, SHAPE_METRICS, shapeSizeFor } from '../sizing';
 import { textBoxSize } from '../textMetrics';
 import type { ShapeBox, ShapeKind } from '../types';
 
-const KINDS: ShapeKind[] = ['rect', 'diamond', 'ellipse'];
+const KINDS: ShapeKind[] = ['rect', 'diamond', 'ellipse', 'triangle'];
 
 /** The four corners of the centred text box, which the outline must contain. */
 function textCorners(
@@ -86,8 +86,9 @@ describe('shapeSizeFor', () => {
 });
 
 describe('fontSizeFor', () => {
-  it('gives entities the largest text and attributes the smallest', () => {
+  it('gives entities the largest text and ISA nodes the smallest', () => {
     expect(fontSizeFor('rect')).toBeGreaterThan(fontSizeFor('diamond'));
     expect(fontSizeFor('diamond')).toBeGreaterThan(fontSizeFor('ellipse'));
+    expect(fontSizeFor('ellipse')).toBeGreaterThan(fontSizeFor('triangle'));
   });
 });

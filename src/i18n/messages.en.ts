@@ -66,6 +66,8 @@ export const messages = {
   /** Fallback label for an element the student has not named yet. */
   element: {
     unnamed: 'an unnamed element',
+    /** The fixed word drawn inside an ISA triangle; specializations have no name. */
+    specialization: 'ISA',
   },
 
   canvas: {

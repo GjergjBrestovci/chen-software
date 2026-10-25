@@ -8,6 +8,8 @@ import { add, EPSILON, isZero, scale, subtract } from './vectors';
  * - rect: `|x| = halfWidth` or `|y| = halfHeight`, whichever the ray meets first
  * - diamond: `|x|/halfWidth + |y|/halfHeight = 1`
  * - ellipse: `(x/halfWidth)² + (y/halfHeight)² = 1`
+ * - triangle: three sides as half-planes; unlike the others it is not
+ *   symmetric up-down, so the ray's signed direction matters
  */
 function boundaryScale(
   kind: ShapeKind,
@@ -28,6 +30,18 @@ function boundaryScale(
       return 1 / (dx / halfWidth + dy / halfHeight);
     case 'ellipse':
       return 1 / Math.hypot(direction.x / halfWidth, direction.y / halfHeight);
+    case 'triangle': {
+      // The apex-up triangle breaks the |x|, |y| symmetry the other cases use:
+      // a ray leaves through the first slanted side or the base it heads for.
+      let nearest = Number.POSITIVE_INFINITY;
+      for (const normal of halfPlanes('triangle', halfWidth, halfHeight)) {
+        const towards = normal.x * direction.x + normal.y * direction.y;
+        if (towards > EPSILON) {
+          nearest = Math.min(nearest, 1 / towards);
+        }
+      }
+      return nearest;
+    }
   }
 }
 
@@ -71,6 +85,13 @@ export function containsPoint(box: ShapeBox, point: Point): boolean {
       return dx + dy <= 1 + EPSILON;
     case 'ellipse':
       return dx * dx + dy * dy <= 1 + EPSILON;
+    case 'triangle': {
+      // Signed vertically: the slanted sides widen downwards and the base
+      // closes the shape off, so the top corners of the bounding box are out
+      // and the bottom corners are exactly on the outline.
+      const sy = (point.y - box.center.y) / halfHeight;
+      return 2 * dx - sy <= 1 + EPSILON && sy <= 1 + EPSILON;
+    }
   }
 }
 
@@ -118,12 +139,26 @@ export function insetBox(box: ShapeBox, inset: number = DOUBLE_OUTLINE_INSET): S
 }
 
 /**
- * The sides of a rectangle or diamond as half-planes `n · p <= 1`, with `p`
- * relative to the centre.
+ * The sides of a rectangle, diamond or apex-up triangle as half-planes
+ * `n · p <= 1`, with `p` relative to the centre.
+ *
+ * The triangle's base sits at `+halfHeight` and its apex straight above the
+ * centre; each slanted side runs through the apex and one bottom corner.
  */
-function halfPlanes(kind: 'rect' | 'diamond', halfWidth: number, halfHeight: number): Point[] {
+function halfPlanes(
+  kind: 'rect' | 'diamond' | 'triangle',
+  halfWidth: number,
+  halfHeight: number,
+): Point[] {
   const x = 1 / halfWidth;
   const y = 1 / halfHeight;
+  if (kind === 'triangle') {
+    return [
+      { x: -2 * x, y: -y },
+      { x: 2 * x, y: -y },
+      { x: 0, y },
+    ];
+  }
   return kind === 'rect'
     ? [
         { x, y: 0 },

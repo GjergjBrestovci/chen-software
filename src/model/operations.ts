@@ -145,6 +145,9 @@ export function addAttribute(document: ErDocument, params: AddAttributeParams): 
   if (ownerKind === undefined) {
     throw new ModelError(`Unknown attribute owner "${params.ownerId}".`);
   }
+  if (ownerKind === 'specialization') {
+    throw new ModelError('A specialization cannot own attributes.');
+  }
 
   if (ownerKind === 'attribute') {
     const owner = findAttribute(document.model, params.ownerId);
@@ -185,6 +188,10 @@ export function renameElement(document: ErDocument, params: RenameElementParams)
   const kind = findElementKind(document.model, params.id);
   if (kind === undefined) {
     throw new ModelError(`Unknown element "${params.id}".`);
+  }
+  if (kind === 'specialization') {
+    // The triangle is drawn with the fixed word ISA; there is no name to set.
+    throw new ModelError('A specialization has no name.');
   }
 
   return produce(document, (draft) => {

@@ -8,6 +8,7 @@ import {
   createEmptyDocument,
   deleteElements,
   removeRelationshipEnd,
+  renameElement,
   setAttributeColumn,
   setAttributeForeignKey,
   setAttributeIdentifier,
@@ -359,5 +360,46 @@ describe('cascade edge cases', () => {
   it('copes with a part listed before its composite', () => {
     const document = deleteElements(sample(), ['first', 'name']);
     expect(document.model.attributes).toEqual([]);
+  });
+});
+
+describe('specialization guards', () => {
+  /** PERSON → isa → STUDENT/TEACHER, as a stored model; creation ops come later. */
+  function withIsa(): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'person', name: 'PERSON', position: origin });
+    document = addEntity(document, { id: 'student', name: 'STUDENT', position: origin });
+    document = addEntity(document, { id: 'teacher', name: 'TEACHER', position: origin });
+    return {
+      ...document,
+      model: {
+        ...document.model,
+        specializations: [
+          {
+            id: 'isa',
+            superId: 'person',
+            subIds: ['student', 'teacher'],
+            coverage: 'partial',
+            overlap: 'disjoint',
+          },
+        ],
+      },
+    };
+  }
+
+  it('refuses to rename a specialization, which has no name', () => {
+    expect(() => renameElement(withIsa(), { id: 'isa', name: 'oops' })).toThrow(ModelError);
+  });
+
+  it('refuses attributes hanging off a specialization', () => {
+    expect(() =>
+      addAttribute(withIsa(), { id: 'attr', ownerId: 'isa', name: 'x', offset: origin }),
+    ).toThrow(ModelError);
+  });
+
+  it('treats a specialization id as taken when adding entities', () => {
+    expect(() => addEntity(withIsa(), { id: 'isa', name: 'GHOST', position: origin })).toThrow(
+      ModelError,
+    );
   });
 });

@@ -83,6 +83,9 @@ function outline(box: ShapeBox, stroke: string, fill: string, extra: string): st
       return `<rect x="${n(x - halfWidth)}" y="${n(y - halfHeight)}" width="${n(box.size.width)}" height="${n(box.size.height)}" ${paint}/>`;
     case 'ellipse':
       return `<ellipse cx="${n(x)}" cy="${n(y)}" rx="${n(halfWidth)}" ry="${n(halfHeight)}" ${paint}/>`;
+    case 'triangle':
+      // Apex up, base across the bottom: the ISA node's outline.
+      return `<polygon points="${n(x)},${n(y - halfHeight)} ${n(x + halfWidth)},${n(y + halfHeight)} ${n(x - halfWidth)},${n(y + halfHeight)}" ${paint}/>`;
     case 'diamond':
       return `<polygon points="${n(x)},${n(y - halfHeight)} ${n(x + halfWidth)},${n(y)} ${n(x)},${n(y + halfHeight)} ${n(x - halfWidth)},${n(y)}" ${paint}/>`;
   }

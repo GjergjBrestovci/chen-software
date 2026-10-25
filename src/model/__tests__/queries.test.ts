@@ -13,6 +13,7 @@ import {
   findAttribute,
   findElementKind,
   findElementName,
+  findElementRef,
   findEntity,
   findRelationship,
   relationshipsTouching,
@@ -254,5 +255,12 @@ describe('specialization queries', () => {
       'isa2',
       'mammal',
     ]);
+  });
+
+  it('classifies specialization ids like any other element', () => {
+    const model = chain();
+    expect(findElementKind(model, 'isa1')).toBe('specialization');
+    expect(findElementRef(model, 'isa1')).toEqual({ kind: 'specialization', name: 'ISA' });
+    expect(findElementName(model, 'isa1')).toBe('ISA');
   });
 });
