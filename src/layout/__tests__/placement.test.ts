@@ -1,18 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { shapeSizeFor } from '../../geometry';
+import { absoluteBoxes } from '../boxes';
 import { ModelError } from '../../model/errors';
 import {
   addAttribute,
   addEntity,
   addRelationship,
+  addSpecialization,
   createEmptyDocument,
 } from '../../model/operations';
-import type { ErDocument } from '../../model/types';
+import type { ErDocument, Position } from '../../model/types';
 import {
   attributeOffsetFor,
   findFreeOffset,
   freeSpotFor,
   placeMissingPositions,
+  specializationPositionFor,
 } from '../placement';
 import type { AttributeSlotContext } from '../placement';
 
@@ -431,5 +434,77 @@ describe('freeSpotFor', () => {
     });
     const stripped: ErDocument = { ...document, layout: { positions: {} } };
     expect(freeSpotFor(stripped, { x: 0, y: 0 }, SIZE)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('specializationPositionFor', () => {
+  const triangle = shapeSizeFor('triangle', 'ISA');
+
+  /** PERSON above, STUDENT and TEACHER in a row below: the lesson layout. */
+  function row(): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'person', name: 'PERSON', position: { x: 0, y: 0 } });
+    document = addEntity(document, {
+      id: 'student',
+      name: 'STUDENT',
+      position: { x: -200, y: 400 },
+    });
+    document = addEntity(document, {
+      id: 'teacher',
+      name: 'TEACHER',
+      position: { x: 200, y: 400 },
+    });
+    return document;
+  }
+
+  function centreOf(top: Position): Position {
+    return { x: top.x + triangle.width / 2, y: top.y + triangle.height / 2 };
+  }
+
+  it('centres the triangle between the superclass and the subclass centroid', () => {
+    const document = row();
+    const boxes = absoluteBoxes(document);
+    const person = boxes.get('person');
+    const student = boxes.get('student');
+    const teacher = boxes.get('teacher');
+    if (!person || !student || !teacher) throw new Error('fixture lost its boxes');
+
+    const centre = centreOf(specializationPositionFor(document, 'person', ['student', 'teacher']));
+    const expectedY = (person.center.y + (student.center.y + teacher.center.y) / 2) / 2;
+    const expectedX = (person.center.x + (student.center.x + teacher.center.x) / 2) / 2;
+    expect(centre.x).toBeCloseTo(expectedX, 6);
+    expect(centre.y).toBeCloseTo(expectedY, 6);
+  });
+
+  it('slides away from an entity that already covers the midpoint', () => {
+    const document = row();
+    const clear = specializationPositionFor(document, 'person', ['student', 'teacher']);
+    const blocked = addEntity(document, { id: 'blocker', name: 'X', position: clear });
+    const moved = specializationPositionFor(blocked, 'person', ['student', 'teacher']);
+    expect(moved).not.toEqual(clear);
+  });
+
+  it('refuses unknown participants and an empty subclass list', () => {
+    const document = row();
+    expect(() => specializationPositionFor(document, 'nobody', ['student', 'teacher'])).toThrow(
+      ModelError,
+    );
+    expect(() => specializationPositionFor(document, 'person', ['student', 'nobody'])).toThrow(
+      ModelError,
+    );
+    expect(() => specializationPositionFor(document, 'person', [])).toThrow(ModelError);
+  });
+
+  it('treats a live triangle as occupied when placing entities', () => {
+    let document = row();
+    const where = specializationPositionFor(document, 'person', ['student', 'teacher']);
+    document = addSpecialization(document, {
+      id: 'isa',
+      superId: 'person',
+      subIds: ['student', 'teacher'],
+      position: where,
+    });
+    const placed = freeSpotFor(document, where, shapeSizeFor('rect', 'BOOK'));
+    expect(placed).not.toEqual(where);
   });
 });
