@@ -43,6 +43,20 @@ export const messages = {
       `The foreign key ${attribute} references an entity that is missing from the file, so nothing was loaded.`,
     attributeOwnerCycle: (attribute: string): string =>
       `The attribute ${attribute} is part of itself, which cannot be drawn, so nothing was loaded.`,
+    unknownSpecializationElement: (specialization: string): string =>
+      `The specialization under ${specialization} connects to an entity that is missing from the file, so nothing was loaded.`,
+    specializationDuplicateSub: (specialization: string): string =>
+      `The specialization under ${specialization} lists the same subclass twice, so nothing was loaded.`,
+    specializationSelfSub: (specialization: string): string =>
+      `The specialization under ${specialization} is also one of its own subclasses, so nothing was loaded.`,
+    specializationSubTwice: (entity: string): string =>
+      `The entity ${entity} is a subclass in two specializations, so nothing was loaded.`,
+    specializationSuperTwice: (entity: string): string =>
+      `The entity ${entity} is the superclass of two specializations, so nothing was loaded.`,
+    specializationCycle: (entity: string): string =>
+      `The specialization under ${entity} leads back to itself, which cannot be drawn, so nothing was loaded.`,
+    specializationWeak: (entity: string): string =>
+      `The entity ${entity} is weak, and a weak entity cannot take part in a specialization, so nothing was loaded.`,
     placedMissingPositions: (count: number): string =>
       count === 1
         ? 'One element had no saved position and was placed on the canvas for you.'

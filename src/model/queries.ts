@@ -1,4 +1,12 @@
-import type { Attribute, ElementKind, Entity, ErModel, Id, Relationship } from './types';
+import type {
+  Attribute,
+  ElementKind,
+  Entity,
+  ErModel,
+  Id,
+  Relationship,
+  Specialization,
+} from './types';
 
 export function findEntity(model: ErModel, id: Id): Entity | undefined {
   return model.entities.find((entity) => entity.id === id);
@@ -100,11 +108,56 @@ export function relationshipsTouching(model: ErModel, entityId: Id): Relationshi
   );
 }
 
+/** Every specialization the entity appears in, as superclass or as subclass. */
+export function specializationsInvolving(model: ErModel, entityId: Id): Specialization[] {
+  return model.specializations.filter(
+    (spec) => spec.superId === entityId || spec.subIds.includes(entityId),
+  );
+}
+
+/** The specialization node with this id, if there is one. */
+export function findSpecialization(model: ErModel, id: Id): Specialization | undefined {
+  return model.specializations.find((spec) => spec.id === id);
+}
+
+/** The node that splits `superId` into subclasses, if it is split at all. */
+export function specializationOfSuper(model: ErModel, superId: Id): Specialization | undefined {
+  return model.specializations.find((spec) => spec.superId === superId);
+}
+
+/** The node `subId` is a subclass in, if it is a subclass at all. */
+export function specializationOfSub(model: ErModel, subId: Id): Specialization | undefined {
+  return model.specializations.find((spec) => spec.subIds.includes(subId));
+}
+
+/**
+ * True when `ancestorId` sits above `descendantId` in an ISA chain. A cyclic
+ * model cannot come from a valid file; as in `rootOwnerOf`, the walk then
+ * answers `false` rather than looping forever.
+ */
+export function isAncestorOf(model: ErModel, ancestorId: Id, descendantId: Id): boolean {
+  const seen = new Set<Id>([descendantId]);
+  let current = descendantId;
+
+  for (;;) {
+    const parent = specializationOfSub(model, current)?.superId;
+    if (parent === undefined || seen.has(parent)) {
+      return false;
+    }
+    if (parent === ancestorId) {
+      return true;
+    }
+    seen.add(parent);
+    current = parent;
+  }
+}
+
 /** Ids of every element in the model. Used for integrity checks and pruning. */
 export function allElementIds(model: ErModel): Id[] {
   return [
     ...model.entities.map((entity) => entity.id),
     ...model.relationships.map((relationship) => relationship.id),
+    ...model.specializations.map((spec) => spec.id),
     ...model.attributes.map((attribute) => attribute.id),
   ];
 }

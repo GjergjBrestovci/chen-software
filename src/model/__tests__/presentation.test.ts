@@ -11,7 +11,12 @@ import {
 
 describe('DEFAULT_THEME', () => {
   it('chooses no colour, so components follow the interface ink', () => {
-    expect(DEFAULT_THEME).toEqual({ entity: null, relationship: null, attribute: null });
+    expect(DEFAULT_THEME).toEqual({
+      entity: null,
+      relationship: null,
+      attribute: null,
+      specialization: null,
+    });
   });
 
   it('starts a presentation with no overrides', () => {
@@ -19,7 +24,12 @@ describe('DEFAULT_THEME', () => {
   });
 
   it('copies the theme rather than aliasing it', () => {
-    const theme = { entity: '#2563eb', relationship: null, attribute: null };
+    const theme = {
+      entity: '#2563eb',
+      relationship: null,
+      attribute: null,
+      specialization: null,
+    };
     const presentation = createPresentation(theme);
     theme.entity = '#dc2626';
     expect(presentation.theme.entity).toBe('#2563eb');
@@ -36,6 +46,7 @@ describe('colorFor', () => {
       entity: '#2563eb',
       relationship: '#16a34a',
       attribute: '#d97706',
+      specialization: '#0d9488',
     });
     expect(colorFor(presentation, 'a', 'entity')).toBe('#2563eb');
     expect(colorFor(presentation, 'a', 'relationship')).toBe('#16a34a');

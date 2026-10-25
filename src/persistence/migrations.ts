@@ -1,13 +1,13 @@
 import { z } from 'zod';
 import { messages } from '../i18n/messages.en';
-import { createPresentation } from '../model/presentation';
 import { createColumnSpec } from '../model/column';
 import {
   attributeV2Schema,
   CURRENT_VERSION,
   erDocumentSchema,
-  erModelSchema,
+  erModelV3Schema,
   parseErDocument,
+  presentationV3Schema,
   versionOf,
 } from '../model/schema';
 import type { ParseOutcome } from '../model/schema';
@@ -59,13 +59,34 @@ const erDocumentV1Schema = z.strictObject({
 
 type ErDocumentV1 = z.infer<typeof erDocumentV1Schema>;
 
-/** Version 2: everything version 3 has except the attributes' `column`. */
+/**
+ * Version 2: everything version 4 has except the attributes' `column`, the
+ * specializations and their theme colour.
+ */
 const erDocumentV2Schema = erDocumentSchema.extend({
   version: z.literal(2),
-  model: erModelSchema.extend({ attributes: z.array(attributeV2Schema) }),
+  model: erModelV3Schema.extend({ attributes: z.array(attributeV2Schema) }),
+  presentation: presentationV3Schema,
 });
 
 type ErDocumentV2 = z.infer<typeof erDocumentV2Schema>;
+
+/** Version 3: everything version 4 has except the specializations and their theme colour. */
+const erDocumentV3Schema = erDocumentSchema.extend({
+  version: z.literal(3),
+  model: erModelV3Schema,
+  presentation: presentationV3Schema,
+});
+
+type ErDocumentV3 = z.infer<typeof erDocumentV3Schema>;
+
+/** The version 3 default presentation: no colour chosen for any component. */
+function createPresentationV3(): z.infer<typeof presentationV3Schema> {
+  return {
+    theme: { entity: null, relationship: null, attribute: null },
+    colors: {},
+  };
+}
 
 /**
  * Version 1 to 2.
@@ -104,7 +125,7 @@ function migrateV1ToV2(document: ErDocumentV1): ErDocumentV2 {
       })),
     },
     layout: { positions: { ...document.layout.positions } },
-    presentation: createPresentation(),
+    presentation: createPresentationV3(),
     dismissedHints: [...document.dismissedHints],
   };
 }
@@ -114,7 +135,7 @@ function migrateV1ToV2(document: ErDocumentV1): ErDocumentV2 {
  * They are invisible on the diagram, so the upgrade changes nothing a student
  * can see; the SQL export falls back to its defaults until they fill them in.
  */
-function migrateV2ToV3(document: ErDocumentV2): ErDocument {
+function migrateV2ToV3(document: ErDocumentV2): ErDocumentV3 {
   return {
     ...document,
     version: 3,
@@ -124,6 +145,23 @@ function migrateV2ToV3(document: ErDocumentV2): ErDocument {
         ...attribute,
         column: createColumnSpec(),
       })),
+    },
+  };
+}
+
+/**
+ * Version 3 to 4. The specialization list starts empty and the new theme colour
+ * means "not chosen", so an upgraded diagram looks and behaves exactly as it
+ * did — the same rule every earlier upgrade followed.
+ */
+function migrateV3ToV4(document: ErDocumentV3): ErDocument {
+  return {
+    ...document,
+    version: 4,
+    model: { ...document.model, specializations: [] },
+    presentation: {
+      ...document.presentation,
+      theme: { ...document.presentation.theme, specialization: null },
     },
   };
 }
@@ -144,7 +182,7 @@ export function migrateToCurrent(input: unknown): MigrationOutcome {
     if (!parsed.success) {
       return { ok: false, message: messages.file.invalid };
     }
-    return { ok: true, value: migrateV2ToV3(migrateV1ToV2(parsed.data)) };
+    return { ok: true, value: migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed.data))) };
   }
 
   if (version === 2) {
@@ -152,7 +190,15 @@ export function migrateToCurrent(input: unknown): MigrationOutcome {
     if (!parsed.success) {
       return { ok: false, message: messages.file.invalid };
     }
-    return { ok: true, value: migrateV2ToV3(parsed.data) };
+    return { ok: true, value: migrateV3ToV4(migrateV2ToV3(parsed.data)) };
+  }
+
+  if (version === 3) {
+    const parsed = erDocumentV3Schema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, message: messages.file.invalid };
+    }
+    return { ok: true, value: migrateV3ToV4(parsed.data) };
   }
 
   return { ok: false, message: messages.file.unsupportedVersion(version) };

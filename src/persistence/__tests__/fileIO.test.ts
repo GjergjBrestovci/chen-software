@@ -63,7 +63,7 @@ describe('openDocumentText', () => {
     const outcome = openDocumentText(fixture('bookstore-v1.erd.json'));
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.value.document.version).toBe(3);
+    expect(outcome.value.document.version).toBe(4);
   });
 
   it('rejects unreadable JSON', () => {

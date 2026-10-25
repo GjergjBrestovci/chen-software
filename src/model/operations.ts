@@ -48,9 +48,9 @@ export const MIN_RELATIONSHIP_ENDS = 2;
 
 export function createEmptyDocument(title: string = messages.document.untitled): ErDocument {
   return {
-    version: 3,
+    version: 4,
     title,
-    model: { entities: [], attributes: [], relationships: [] },
+    model: { entities: [], attributes: [], relationships: [], specializations: [] },
     layout: { positions: {} },
     presentation: createPresentation(),
     dismissedHints: [],

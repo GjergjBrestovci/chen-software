@@ -5,7 +5,7 @@ import { createColumnSpec } from '../../model/column';
 import { createEmptyDocument } from '../../model/operations';
 import { DEFAULT_THEME } from '../../model/presentation';
 import { CURRENT_VERSION } from '../../model/schema';
-import type { Attribute, ErDocument } from '../../model/types';
+import type { ErDocument } from '../../model/types';
 
 function fixture(name: string): string {
   return readFileSync(new URL(`../../../fixtures/${name}`, import.meta.url), 'utf8');
@@ -134,21 +134,23 @@ describe('version 1 to 2', () => {
   });
 });
 
-/** The bookstore fixture as version 2 wrote it: no `column` on any attribute. */
+/** The bookstore fixture as version 2 wrote it: no `column`, no specializations. */
 function v2(): Record<string, unknown> {
-  const document = JSON.parse(fixture('bookstore.erd.json')) as ErDocument;
-  return {
-    ...document,
-    version: 2,
-    model: {
-      ...document.model,
-      attributes: document.model.attributes.map((attribute) => {
-        const withoutColumn: Partial<Attribute> = { ...attribute };
-        delete withoutColumn.column;
-        return withoutColumn;
-      }),
-    },
-  };
+  const raw = JSON.parse(fixture('bookstore.erd.json')) as Record<string, unknown>;
+  const model = raw['model'] as Record<string, unknown>;
+  delete model['specializations'];
+  model['attributes'] = (model['attributes'] as Record<string, unknown>[]).map((attribute) => {
+    const withoutColumn: Record<string, unknown> = { ...attribute };
+    delete withoutColumn['column'];
+    return withoutColumn;
+  });
+  const theme = (raw['presentation'] as Record<string, unknown>)['theme'] as Record<
+    string,
+    unknown
+  >;
+  delete theme['specialization'];
+  raw['version'] = 2;
+  return raw;
 }
 
 describe('version 2 to 3', () => {
@@ -157,7 +159,7 @@ describe('version 2 to 3', () => {
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
     const { document } = outcome.value;
-    expect(document.version).toBe(3);
+    expect(document.version).toBe(4);
     expect(document.model.attributes).toHaveLength(11);
     expect(document.model.attributes.every((a) => a.column.type === null)).toBe(true);
     expect(document.model.attributes[0]?.column).toEqual(createColumnSpec());
@@ -171,7 +173,10 @@ describe('version 2 to 3', () => {
     expect(after.model.entities).toEqual(before.model.entities);
     expect(after.model.relationships).toEqual(before.model.relationships);
     expect(after.layout).toEqual(before.layout);
-    expect(after.presentation).toEqual(before.presentation);
+    expect(after.presentation).toEqual({
+      ...before.presentation,
+      theme: { ...before.presentation.theme, specialization: null },
+    });
     expect(after.title).toBe(before.title);
   });
 
@@ -182,7 +187,59 @@ describe('version 2 to 3', () => {
   });
 
   it('rejects a version 2 file that already has column details, since v2 never wrote them', () => {
-    const raw = { ...(JSON.parse(fixture('bookstore.erd.json')) as object), version: 2 };
+    const raw = v2();
+    (raw['model'] as Record<string, unknown>)['attributes'] = (
+      JSON.parse(fixture('bookstore.erd.json')) as ErDocument
+    ).model.attributes;
+    expect(migrateToCurrent(raw).ok).toBe(false);
+  });
+});
+
+/** The bookstore fixture as version 3 wrote it: no specializations, three theme colours. */
+function v3(): Record<string, unknown> {
+  const raw = JSON.parse(fixture('bookstore.erd.json')) as Record<string, unknown>;
+  const model = raw['model'] as Record<string, unknown>;
+  delete model['specializations'];
+  const presentation = raw['presentation'] as Record<string, unknown>;
+  const theme = presentation['theme'] as Record<string, unknown>;
+  delete theme['specialization'];
+  raw['version'] = 3;
+  return raw;
+}
+
+describe('version 3 to 4', () => {
+  it('adds an empty specialization list and the theme colour', () => {
+    const outcome = readDocument(v3());
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.value.document.version).toBe(4);
+    expect(outcome.value.document.model.specializations).toEqual([]);
+    expect(outcome.value.document.presentation.theme.specialization).toBeNull();
+  });
+
+  it('changes nothing else', () => {
+    const before = v3() as unknown as ErDocument;
+    const outcome = readDocument(v3());
+    if (!outcome.ok) throw new Error(outcome.message);
+    const after = outcome.value.document;
+    expect(after.model.entities).toEqual(before.model.entities);
+    expect(after.model.attributes).toEqual(before.model.attributes);
+    expect(after.model.relationships).toEqual(before.model.relationships);
+    expect(after.layout).toEqual(before.layout);
+    expect(after.presentation.colors).toEqual(before.presentation.colors);
+    expect(after.title).toBe(before.title);
+    expect(after.dismissedHints).toEqual(before.dismissedHints);
+  });
+
+  it('rejects a damaged version 3 file before transforming it', () => {
+    const raw = v3();
+    raw['layout'] = 'nope';
+    expect(migrateToCurrent(raw).ok).toBe(false);
+  });
+
+  it('rejects a version 3 file that already has specializations, since v3 never wrote them', () => {
+    const raw = v3();
+    (raw['model'] as Record<string, unknown>)['specializations'] = [];
     expect(migrateToCurrent(raw).ok).toBe(false);
   });
 });

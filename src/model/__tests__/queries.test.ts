@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { addAttribute, addEntity, addRelationship, createEmptyDocument } from '../operations';
 import {
   allElementIds,
+  findSpecialization,
+  isAncestorOf,
   isDescendantOf,
+  specializationOfSub,
+  specializationOfSuper,
+  specializationsInvolving,
   rootOwnerOf,
   attributesOf,
   findAttribute,
@@ -164,5 +169,90 @@ describe('composite ancestry', () => {
       ),
     };
     expect(isDescendantOf(cyclic, 'first', 'book')).toBe(false);
+  });
+});
+
+describe('specialization queries', () => {
+  /** The lesson-05 zoo: ANIMAL → {MAMMAL, BIRD}, MAMMAL → {CARNIVORE, HERBIVORE}. */
+  function chain(): ErModel {
+    let document = createEmptyDocument('Zoo');
+    for (const name of ['ANIMAL', 'MAMMAL', 'BIRD', 'CARNIVORE', 'HERBIVORE']) {
+      document = addEntity(document, { id: name.toLowerCase(), name, position: origin });
+    }
+    return {
+      ...document.model,
+      specializations: [
+        {
+          id: 'isa1',
+          superId: 'animal',
+          subIds: ['mammal', 'bird'],
+          coverage: 'total',
+          overlap: 'disjoint',
+        },
+        {
+          id: 'isa2',
+          superId: 'mammal',
+          subIds: ['carnivore', 'herbivore'],
+          coverage: 'partial',
+          overlap: 'disjoint',
+        },
+      ],
+    };
+  }
+
+  it('finds a specialization by id', () => {
+    expect(findSpecialization(chain(), 'isa1')?.superId).toBe('animal');
+    expect(findSpecialization(chain(), 'isa2')?.subIds).toEqual(['carnivore', 'herbivore']);
+    expect(findSpecialization(chain(), 'ghost')).toBeUndefined();
+  });
+
+  it('finds the node from the superclass side', () => {
+    expect(specializationOfSuper(chain(), 'animal')?.id).toBe('isa1');
+    expect(specializationOfSuper(chain(), 'mammal')?.id).toBe('isa2');
+    expect(specializationOfSuper(chain(), 'bird')).toBeUndefined();
+  });
+
+  it('finds the node from the subclass side', () => {
+    expect(specializationOfSub(chain(), 'mammal')?.id).toBe('isa1');
+    expect(specializationOfSub(chain(), 'carnivore')?.id).toBe('isa2');
+    expect(specializationOfSub(chain(), 'animal')).toBeUndefined();
+  });
+
+  it('lists every specialization an entity belongs to, either side', () => {
+    expect(specializationsInvolving(chain(), 'mammal').map((s) => s.id)).toEqual(['isa1', 'isa2']);
+    expect(specializationsInvolving(chain(), 'bird').map((s) => s.id)).toEqual(['isa1']);
+    expect(specializationsInvolving(chain(), 'animal').map((s) => s.id)).toEqual(['isa1']);
+  });
+
+  it('walks ISA ancestors at any depth', () => {
+    const model = chain();
+    expect(isAncestorOf(model, 'animal', 'carnivore')).toBe(true);
+    expect(isAncestorOf(model, 'mammal', 'carnivore')).toBe(true);
+    expect(isAncestorOf(model, 'mammal', 'bird')).toBe(false);
+    expect(isAncestorOf(model, 'carnivore', 'animal')).toBe(false);
+    expect(isAncestorOf(model, 'animal', 'animal')).toBe(false);
+  });
+
+  it('terminates on a cyclic specialization instead of hanging', () => {
+    const model = chain();
+    const cyclic: ErModel = {
+      ...model,
+      specializations: model.specializations.map((spec) =>
+        spec.id === 'isa2' ? { ...spec, subIds: ['animal', 'carnivore'] } : spec,
+      ),
+    };
+    expect(isAncestorOf(cyclic, 'herbivore', 'animal')).toBe(false);
+  });
+
+  it('includes specialization ids in allElementIds', () => {
+    expect(allElementIds(chain()).sort()).toEqual([
+      'animal',
+      'bird',
+      'carnivore',
+      'herbivore',
+      'isa1',
+      'isa2',
+      'mammal',
+    ]);
   });
 });

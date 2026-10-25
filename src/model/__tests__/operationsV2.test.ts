@@ -317,6 +317,7 @@ describe('colour', () => {
       entity: '#b91c1c',
       relationship: '#b91c1c',
       attribute: '#b91c1c',
+      specialization: '#b91c1c',
     });
     expect(colorFor(document.presentation, 'dept', 'entity')).toBe('#2563eb');
     expect(colorFor(document.presentation, 'course', 'entity')).toBe('#b91c1c');
