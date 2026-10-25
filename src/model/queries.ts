@@ -5,8 +5,10 @@ import type {
   Entity,
   ErModel,
   Id,
+  Participation,
   Relationship,
   Specialization,
+  SpecializationOverlap,
 } from './types';
 
 export function findEntity(model: ErModel, id: Id): Entity | undefined {
@@ -139,6 +141,70 @@ export function specializationOfSuper(model: ErModel, superId: Id): Specializati
 /** The node `subId` is a subclass in, if it is a subclass at all. */
 export function specializationOfSub(model: ErModel, subId: Id): Specialization | undefined {
   return model.specializations.find((spec) => spec.subIds.includes(subId));
+}
+
+/**
+ * How the course abbreviates the two constraints on the ISA triangle:
+ * (t,d), (t,nd), (p,d) or (p,nd). The letters are notation, not prose, so
+ * they stay outside `i18n/`.
+ */
+export function isaConstraintText(coverage: Participation, overlap: SpecializationOverlap): string {
+  const total = coverage === 'total' ? 't' : 'p';
+  const disjoint = overlap === 'disjoint' ? 'd' : 'nd';
+  return `(${total},${disjoint})`;
+}
+
+/**
+ * True when `addSpecialization` would accept these participants: an
+ * unsplit regular superclass, regular subclasses claimed by no node, and no
+ * cycle. Arity stays the caller's business; the operation checks it too.
+ */
+export function canSpecialize(model: ErModel, superId: Id, subIds: readonly Id[]): boolean {
+  const superEntity = findEntity(model, superId);
+  if (superEntity === undefined || superEntity.kind === 'weak') {
+    return false;
+  }
+  if (specializationOfSuper(model, superId) !== undefined) {
+    return false;
+  }
+  if (new Set(subIds).size !== subIds.length) {
+    return false;
+  }
+  for (const subId of subIds) {
+    const subEntity = findEntity(model, subId);
+    if (subEntity === undefined || subEntity.kind === 'weak') {
+      return false;
+    }
+    if (subId === superEntity.id) {
+      return false;
+    }
+    if (specializationOfSub(model, subId) !== undefined) {
+      return false;
+    }
+    if (isAncestorOf(model, subId, superId)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** True when `entityId` could join `specId` as a further subclass. */
+export function canAttachSub(model: ErModel, specId: Id, entityId: Id): boolean {
+  const spec = findSpecialization(model, specId);
+  if (spec === undefined) {
+    return false;
+  }
+  const entity = findEntity(model, entityId);
+  if (entity === undefined || entity.kind === 'weak') {
+    return false;
+  }
+  if (entityId === spec.superId || spec.subIds.includes(entityId)) {
+    return false;
+  }
+  if (specializationOfSub(model, entityId) !== undefined) {
+    return false;
+  }
+  return !isAncestorOf(model, entityId, spec.superId);
 }
 
 /**

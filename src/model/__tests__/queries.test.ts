@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { addAttribute, addEntity, addRelationship, createEmptyDocument } from '../operations';
 import {
   allElementIds,
+  canAttachSub,
+  canSpecialize,
   findSpecialization,
+  isaConstraintText,
   isAncestorOf,
   isDescendantOf,
   specializationOfSub,
@@ -18,7 +21,7 @@ import {
   findRelationship,
   relationshipsTouching,
 } from '../queries';
-import type { ErDocument, ErModel } from '../types';
+import type { Entity, ErDocument, ErModel } from '../types';
 
 const origin = { x: 0, y: 0 };
 
@@ -262,5 +265,95 @@ describe('specialization queries', () => {
     expect(findElementKind(model, 'isa1')).toBe('specialization');
     expect(findElementRef(model, 'isa1')).toEqual({ kind: 'specialization', name: 'ISA' });
     expect(findElementName(model, 'isa1')).toBe('ISA');
+  });
+
+  it('writes the course constraint text from the two flags', () => {
+    expect(isaConstraintText('total', 'disjoint')).toBe('(t,d)');
+    expect(isaConstraintText('total', 'non-disjoint')).toBe('(t,nd)');
+    expect(isaConstraintText('partial', 'disjoint')).toBe('(p,d)');
+    expect(isaConstraintText('partial', 'non-disjoint')).toBe('(p,nd)');
+  });
+});
+
+describe('specialization eligibility', () => {
+  function zoo(): ErModel {
+    const entity = (id: string, kind: 'regular' | 'weak' = 'regular'): Entity => ({
+      id,
+      name: id.toUpperCase(),
+      kind,
+    });
+    return {
+      entities: [
+        entity('person'),
+        entity('student'),
+        entity('teacher'),
+        entity('advisor'),
+        entity('ghost', 'weak'),
+        entity('book'),
+        entity('library'),
+        entity('shelf'),
+      ],
+      attributes: [],
+      relationships: [],
+      specializations: [
+        {
+          id: 'isa1',
+          superId: 'person',
+          subIds: ['student', 'teacher'],
+          coverage: 'total',
+          overlap: 'disjoint',
+        },
+        {
+          id: 'isa2',
+          superId: 'student',
+          subIds: ['advisor', 'book'],
+          coverage: 'partial',
+          overlap: 'disjoint',
+        },
+      ],
+    };
+  }
+
+  it('allows a plain superclass into plain subclasses, and answers the rule set', () => {
+    const model = zoo();
+    expect(canSpecialize(model, 'person', ['student', 'teacher'])).toBe(false); // person is split
+    expect(canSpecialize(model, 'teacher', ['person', 'book'])).toBe(false); // teacher is a subclass
+    expect(canSpecialize(model, 'ghost', ['book', 'teacher'])).toBe(false); // weak
+    expect(canSpecialize(model, 'person', ['book', 'teacher'])).toBe(false); // split already taken
+    expect(canSpecialize(model, 'book', ['student', 'ghost'])).toBe(false); // student elsewhere
+    expect(canSpecialize(model, 'teacher', ['library', 'shelf'])).toBe(true);
+    expect(canSpecialize(model, 'advisor', ['library', 'shelf'])).toBe(true);
+  });
+
+  it('refuses the superclass among its own subclasses, repeats, and missing entities', () => {
+    const model = zoo();
+    expect(canSpecialize(model, 'teacher', ['teacher', 'book'])).toBe(false);
+    expect(canSpecialize(model, 'teacher', ['book', 'book'])).toBe(false);
+    expect(canSpecialize(model, 'teacher', ['book', 'nobody'])).toBe(false);
+    expect(canSpecialize(model, 'nobody', ['book', 'teacher'])).toBe(false);
+  });
+
+  it('refuses a chain that would close a cycle', () => {
+    // STUDENT sits below PERSON; a split of BOOK (below STUDENT) back into
+    // STUDENT would loop STUDENT→ADVISOR/BOOK→…→STUDENT.
+    // BOOK sits below STUDENT, which sits below PERSON: PERSON is not a
+    // subclass anywhere, so only the cycle itself may refuse this.
+    expect(canSpecialize(zoo(), 'book', ['person', 'library'])).toBe(false);
+  });
+
+  it('judges attaches against the live node', () => {
+    const model = zoo();
+    expect(canAttachSub(model, 'isa1', 'advisor')).toBe(false); // advisor is a subclass of isa2
+    expect(canAttachSub(model, 'isa1', 'library')).toBe(true);
+    expect(canAttachSub(model, 'isa1', 'person')).toBe(false); // its own superclass
+    expect(canAttachSub(model, 'isa1', 'student')).toBe(false); // already a subclass
+    expect(canAttachSub(model, 'isa1', 'ghost')).toBe(false); // weak
+    expect(canAttachSub(model, 'isa1', 'nobody')).toBe(false); // unknown
+    expect(canAttachSub(model, 'ghost', 'advisor')).toBe(false); // unknown node
+  });
+
+  it('refuses an attach that would close a cycle', () => {
+    // PERSON sits above STUDENT, which is the superclass of isa2.
+    expect(canAttachSub(zoo(), 'isa2', 'person')).toBe(false);
   });
 });
