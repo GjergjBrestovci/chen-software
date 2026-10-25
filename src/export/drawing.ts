@@ -18,7 +18,8 @@ import {
   textLineHeight,
   unionBounds,
 } from '../geometry';
-import type { Bounds, EdgeSegment, Point, ShapeBox } from '../geometry';
+import { arrowHeadAt } from '../geometry';
+import type { ArrowHead, Bounds, EdgeSegment, Point, ShapeBox } from '../geometry';
 import { absoluteBoxes } from '../layout/boxes';
 import { messages } from '../i18n/messages.en';
 import { colorFor } from '../model/presentation';
@@ -69,6 +70,8 @@ export interface Drawing {
   shapes: DrawnShape[];
   /** Every line: attribute links, ISA links, and relationship ends (a total end contributes two). */
   lines: EdgeSegment[];
+  /** Filled arrowheads, one per ISA link that points at a superclass. */
+  arrows: ArrowHead[];
   labels: DrawnLabel[];
   /** Everything that gets ink, or `null` for an empty diagram. */
   bounds: Bounds | null;
@@ -104,6 +107,17 @@ function textBounds(center: Point, text: string, fontSize: number): Bounds {
   };
 }
 
+/** The box a filled arrowhead covers. */
+function arrowBounds(arrow: ArrowHead): Bounds {
+  const points = [arrow.tip, arrow.left, arrow.right];
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  };
+}
+
 function markerBounds(shape: DrawnShape): Bounds[] {
   return markerSlots(shape.box, shape.markers.length).map((slot) => ({
     minX: shape.box.center.x + slot.x - MARKER_SIZE.width / 2,
@@ -118,6 +132,7 @@ export function describeDiagram(document: ErDocument): Drawing {
   const boxes = absoluteBoxes(document);
   const shapes: DrawnShape[] = [];
   const lines: EdgeSegment[] = [];
+  const arrows: ArrowHead[] = [];
   const labels: DrawnLabel[] = [];
 
   const shape = (
@@ -158,7 +173,11 @@ export function describeDiagram(document: ErDocument): Drawing {
     }
     const superBox = boxes.get(spec.superId);
     if (superBox) {
-      lines.push(floatingEdge(superBox, triangle));
+      const superLink = floatingEdge(superBox, triangle);
+      lines.push(superLink);
+      // The line starts on the superclass's outline; the arrow points back
+      // along it, tip touching the superclass.
+      arrows.push(arrowHeadAt(superLink.start, superLink.end));
     }
     for (const subId of spec.subIds) {
       const subBox = boxes.get(subId);
@@ -245,8 +264,9 @@ export function describeDiagram(document: ErDocument): Drawing {
   const bounds = unionBounds([
     ...shapes.map((drawn) => boundsOf(drawn.box)),
     ...shapes.flatMap(markerBounds),
+    ...arrows.map(arrowBounds),
     ...labels.map((label) => textBounds(label.position, label.text, label.fontSize)),
   ]);
 
-  return { shapes, lines, labels, bounds };
+  return { shapes, lines, arrows, labels, bounds };
 }

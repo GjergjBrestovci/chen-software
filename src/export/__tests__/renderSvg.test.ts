@@ -69,6 +69,20 @@ describe('renderSvg of a specialization', () => {
   it('stays well-formed with the floating label above the shape', () => {
     expect(() => renderSvg(describeDiagram(zoo()))).not.toThrow();
   });
+
+  it('paints the superclass arrowhead as a filled triangle', () => {
+    const rendered = renderSvg(describeDiagram(zoo()));
+    const root = parse(rendered.svg);
+    const triangles = [...root.querySelectorAll('polygon')].filter(
+      (polygon) => (polygon.getAttribute('points')?.trim().split(/\s+/).length ?? 0) === 3,
+    );
+    // The node's own outline and the arrowhead.
+    expect(triangles.length).toBe(2);
+    // The arrowhead is pure fill; the node outline carries a stroke.
+    const arrow = triangles.filter((polygon) => !polygon.hasAttribute('stroke'));
+    expect(arrow).toHaveLength(1);
+    expect(arrow[0]?.getAttribute('fill')).toBe('#1a1a1a');
+  });
 });
 
 describe('renderSvg', () => {

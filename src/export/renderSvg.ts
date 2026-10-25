@@ -7,7 +7,7 @@ import {
   textBaselineOffset,
   underlineMetrics,
 } from '../geometry';
-import type { EdgeSegment, ShapeBox } from '../geometry';
+import type { ArrowHead, EdgeSegment, ShapeBox } from '../geometry';
 import { FILL_OPACITY } from '../model/presentation';
 import type { Drawing, DrawnLabel, DrawnShape } from './drawing';
 
@@ -91,6 +91,13 @@ function outline(box: ShapeBox, stroke: string, fill: string, extra: string): st
   }
 }
 
+function arrowMarkup(arrow: ArrowHead): string {
+  const points = `${n(arrow.tip.x)},${n(arrow.tip.y)} ${n(arrow.left.x)},${n(arrow.left.y)} ${n(
+    arrow.right.x,
+  )},${n(arrow.right.y)}`;
+  return `<polygon points="${points}" fill="${INK}"/>`;
+}
+
 function shapeMarkup(shape: DrawnShape, standardNotation: boolean): string {
   const stroke = shape.color ?? INK;
   // Solid outline, 12% fill of the same colour (SPEC.md §6). No colour means ink on paper.
@@ -165,10 +172,12 @@ export function renderSvg(drawing: Drawing, options: SvgOptions = {}): RenderedS
   const width = drawing.bounds.maxX - drawing.bounds.minX + 2 * padding;
   const height = drawing.bounds.maxY - drawing.bounds.minY + 2 * padding;
 
-  // Lines first, so shapes sit on top of the ends that meet them.
+  // Lines first, so shapes sit on top of the ends that meet them; the
+  // arrowheads come after the shapes so no fill ever clips a tip.
   const body = [
     ...drawing.lines.map(line),
     ...drawing.shapes.map((shape) => shapeMarkup(shape, standardNotation)),
+    ...drawing.arrows.map(arrowMarkup),
     ...drawing.labels.map(labelMarkup),
   ].join('');
 

@@ -1,6 +1,6 @@
 import { boundaryPoint, exitPoint } from './shapes';
 import type { Point, ShapeBox } from './types';
-import { add, distance, normalize, perpendicular, scale, subtract } from './vectors';
+import { add, distance, isZero, normalize, perpendicular, scale, subtract } from './vectors';
 
 export interface EdgeSegment {
   /** On the boundary of the first shape. */
@@ -23,6 +23,44 @@ export function floatingEdge(from: ShapeBox, to: ShapeBox): EdgeSegment {
 
 export function edgeLength(segment: EdgeSegment): number {
   return distance(segment.start, segment.end);
+}
+
+/** The filled arrowhead that points at a superclass. */
+export interface ArrowHead {
+  /** Touches the target's outline. */
+  tip: Point;
+  /** The two back corners, either side of the line. */
+  left: Point;
+  right: Point;
+}
+
+/** Default arrowhead: ten pixels along the line, four either side of it. */
+export const ARROW_LENGTH = 10;
+export const ARROW_HALF_WIDTH = 4;
+
+/**
+ * The filled triangle pointing at `tip` from the direction of `from`: the
+ * tip touches the target's outline, the base sits `length` back along the
+ * line and the corners stand `halfWidth` either side of it. A line with no
+ * direction collapses the arrow to the tip rather than producing NaN.
+ */
+export function arrowHeadAt(
+  tip: Point,
+  from: Point,
+  length: number = ARROW_LENGTH,
+  halfWidth: number = ARROW_HALF_WIDTH,
+): ArrowHead {
+  const direction = normalize(subtract(tip, from));
+  if (isZero(direction)) {
+    return { tip: { ...tip }, left: { ...tip }, right: { ...tip } };
+  }
+  const back = add(tip, scale(direction, -length));
+  const side = scale(perpendicular(direction), halfWidth);
+  return {
+    tip: { ...tip },
+    left: add(back, side),
+    right: subtract(back, side),
+  };
 }
 
 /** Unit vector pointing from `start` to `end`, or zero for a zero-length edge. */

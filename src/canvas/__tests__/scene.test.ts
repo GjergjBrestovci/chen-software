@@ -530,6 +530,30 @@ describe('specializations in the scene', () => {
     }
   });
 
+  it('points an arrowhead at the superclass only', () => {
+    const { edges } = scene(zoo());
+    const isaEdges = edges.filter((edge) => edge.id.startsWith('isa:isa:'));
+    const superEdge = isaEdges.find((edge) => edge.target === 'isa');
+    const subEdges = isaEdges.filter((edge) => edge.source === 'isa');
+
+    const arrow = superEdge?.data?.arrow;
+    if (arrow === null || arrow === undefined) {
+      throw new Error('the superclass link lost its arrowhead');
+    }
+    // The tip touches the superclass boundary the line starts from.
+    if (superEdge?.data) {
+      expect(arrow.tip).toEqual(superEdge.data.segment.start);
+    }
+    expect(subEdges.length).toBeGreaterThan(0);
+    for (const edge of subEdges) {
+      expect(edge.data?.arrow).toBeNull();
+    }
+    // Every other link in the scene has no arrowheads at all.
+    for (const edge of edges.filter((candidate) => !candidate.id.startsWith('isa:'))) {
+      expect(edge.data?.arrow).toBeNull();
+    }
+  });
+
   it('carries selection to the triangle', () => {
     const { nodes } = scene(zoo(), { selectedIds: ['isa'] });
     expect(nodes.find((node) => node.id === 'isa')?.selected).toBe(true);

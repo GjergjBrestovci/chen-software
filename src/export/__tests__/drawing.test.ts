@@ -116,6 +116,7 @@ describe('describeDiagram edge cases', () => {
     expect(describeDiagram(createEmptyDocument())).toEqual({
       shapes: [],
       lines: [],
+      arrows: [],
       labels: [],
       bounds: null,
     });
@@ -244,6 +245,22 @@ describe('describeDiagram with a specialization', () => {
     // One line to the superclass and one per subclass; the triangle's own
     // shape adds nothing.
     expect(drawing.lines).toHaveLength(before + 3);
+  });
+
+  it('arrows the superclass end of one link per specialization', () => {
+    const drawing = describeDiagram(zoo());
+    expect(drawing.arrows).toHaveLength(1);
+    const arrow = drawing.arrows[0];
+    const superLink = drawing.lines[0];
+    if (!arrow || !superLink) throw new Error('the arrow or its line is missing');
+    expect(arrow.tip).toEqual(superLink.start);
+    for (const point of [arrow.tip, arrow.left, arrow.right]) {
+      if (!drawing.bounds) throw new Error('no bounds');
+      expect(drawing.bounds.minX).toBeLessThanOrEqual(point.x);
+      expect(drawing.bounds.maxX).toBeGreaterThanOrEqual(point.x);
+      expect(drawing.bounds.minY).toBeLessThanOrEqual(point.y);
+      expect(drawing.bounds.maxY).toBeGreaterThanOrEqual(point.y);
+    }
   });
 
   it('floats the constraint text above the apex, always drawn', () => {

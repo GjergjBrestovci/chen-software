@@ -4,13 +4,14 @@
    not. These must stay `type`. */
 import type { Edge, Node } from '@xyflow/react';
 import {
+  arrowHeadAt,
   boxFromTopLeft,
   cardinalityLabelPlacement,
   floatingEdge,
   shapeSizeFor,
   topLeftOf,
 } from '../geometry';
-import type { EdgeSegment, Point, ShapeBox, Size } from '../geometry';
+import type { ArrowHead, EdgeSegment, Point, ShapeBox, Size } from '../geometry';
 import { ANCHOR_HANDLE_ID } from './nodes/AnchorHandle';
 import { messages } from '../i18n/messages.en';
 import { colorFor } from '../model/presentation';
@@ -101,6 +102,8 @@ export type ChenEdgeData = {
   segment: EdgeSegment;
   /** Present on relationship edges, absent on attribute-to-owner lines. */
   label: CardinalityLabel | null;
+  /** The ISA link to a superclass carries an arrowhead pointing at it. */
+  arrow: ArrowHead | null;
 };
 
 export type AppEdge = Edge<ChenEdgeData, 'chen'>;
@@ -309,7 +312,7 @@ export function buildScene(input: SceneInput): Scene {
       sourceHandle: ANCHOR_HANDLE_ID,
       targetHandle: ANCHOR_HANDLE_ID,
       selectable: false,
-      data: { segment: floatingEdge(box, ownerBox), label: null },
+      data: { segment: floatingEdge(box, ownerBox), label: null, arrow: null },
     });
   }
 
@@ -320,6 +323,7 @@ export function buildScene(input: SceneInput): Scene {
     }
     const superBox = boxes.get(spec.superId);
     if (superBox !== undefined) {
+      const superLink = floatingEdge(superBox, triangle);
       edges.push({
         id: isaEdgeId(spec.id, spec.superId),
         type: 'chen',
@@ -328,7 +332,13 @@ export function buildScene(input: SceneInput): Scene {
         sourceHandle: ANCHOR_HANDLE_ID,
         targetHandle: ANCHOR_HANDLE_ID,
         selectable: false,
-        data: { segment: floatingEdge(superBox, triangle), label: null },
+        // The line starts on the superclass's outline; the arrow points back
+        // along it, so the tip touches the superclass.
+        data: {
+          segment: superLink,
+          label: null,
+          arrow: arrowHeadAt(superLink.start, superLink.end),
+        },
       });
     }
     for (const subId of spec.subIds) {
@@ -344,7 +354,7 @@ export function buildScene(input: SceneInput): Scene {
         sourceHandle: ANCHOR_HANDLE_ID,
         targetHandle: ANCHOR_HANDLE_ID,
         selectable: false,
-        data: { segment: floatingEdge(triangle, subBox), label: null },
+        data: { segment: floatingEdge(triangle, subBox), label: null, arrow: null },
       });
     }
   }
@@ -374,6 +384,7 @@ export function buildScene(input: SceneInput): Scene {
             value: end.cardinality,
             position: placement.position,
           },
+          arrow: null,
         },
       });
     });

@@ -258,6 +258,12 @@ body {
   stroke-width: 1.5;
 }
 
+/* The filled arrowhead pointing at an ISA superclass. */
+.chen-arrow {
+  fill: var(--chen-line);
+  pointer-events: none;
+}
+
 .chen-cardinality {
   background: var(--chen-paper);
   border: 1px solid transparent;
