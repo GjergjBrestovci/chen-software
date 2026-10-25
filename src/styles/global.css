@@ -98,6 +98,22 @@ body {
   background: transparent;
 }
 
+.chen-specialization {
+  background: transparent;
+}
+
+/* The course's constraint text floats above the triangle's apex (lesson 05). */
+.chen-isa-constraint {
+  color: var(--chen-ink);
+  font-size: 11px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: -16px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 .chen-shape-outline {
   height: 100%;
   left: 0;

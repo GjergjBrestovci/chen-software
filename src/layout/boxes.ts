@@ -1,11 +1,13 @@
 import { boxFromTopLeft, shapeSizeFor, topLeftOf } from '../geometry';
 import type { ShapeBox } from '../geometry';
+import { messages } from '../i18n/messages.en';
 import type { ErDocument, Id, Position } from '../model/types';
 
 const ORIGIN: Position = { x: 0, y: 0 };
 
 /**
- * Absolute boxes for every element that can be placed, in owner-before-part
+ * Absolute boxes for every element that can be placed — entities, triangles
+ * and diamonds at canvas coordinates, attributes in owner-before-part
  * order.
  *
  * Attribute positions are offsets from their owner, and a part of a composite
@@ -33,6 +35,14 @@ export function absoluteBoxes(document: ErDocument): Map<Id, ShapeBox> {
         positionOf(relationship.id),
         shapeSizeFor('diamond', relationship.name),
       ),
+    );
+  }
+
+  for (const spec of model.specializations) {
+    const name = messages.element.specialization;
+    boxes.set(
+      spec.id,
+      boxFromTopLeft('triangle', positionOf(spec.id), shapeSizeFor('triangle', name)),
     );
   }
 

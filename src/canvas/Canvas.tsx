@@ -26,6 +26,7 @@ import { Toolbar } from '../ui/Toolbar';
 import { AttributeNode } from './nodes/AttributeNode';
 import { EntityNode } from './nodes/EntityNode';
 import { RelationshipNode } from './nodes/RelationshipNode';
+import { SpecializationNode } from './nodes/SpecializationNode';
 import { ChenEdge } from './edges/ChenEdge';
 import { decideConnect, decideConnectEnd } from './connections';
 import type { ConnectionDecision } from './connections';
@@ -39,6 +40,7 @@ const nodeTypes = {
   entity: EntityNode,
   relationship: RelationshipNode,
   attribute: AttributeNode,
+  specialization: SpecializationNode,
 };
 
 const edgeTypes = { chen: ChenEdge };
@@ -74,7 +76,11 @@ const NEW_NAME = '';
  * student (SPEC.md §1, product rule 1).
  */
 function canOwnAttribute(node: AppNode): boolean {
-  return node.type !== 'attribute' || node.data.isComposite;
+  return (
+    node.type === 'entity' ||
+    node.type === 'relationship' ||
+    (node.type === 'attribute' && node.data.isComposite)
+  );
 }
 
 export function Canvas(): ReactElement {

@@ -156,9 +156,9 @@ function isPositioned(document: ErDocument, id: Id, missing: ReadonlySet<Id>): b
  * whole file being rejected or the element being dropped, which would mean the
  * app editing the student's model (SPEC.md §1, product rule 1).
  *
- * Entities and relationships go in a row below whatever is already positioned,
- * so they never land on top of existing work. Attributes then use the ordinary
- * free-spot search around their owner.
+ * Entities, relationships and triangles go in a row below whatever is
+ * already positioned, so they never land on top of existing work. Attributes
+ * then use the ordinary free-spot search around their owner.
  */
 export function placeMissingPositions(document: ErDocument, missingIds: readonly Id[]): ErDocument {
   const missing = new Set(missingIds);
@@ -169,9 +169,8 @@ export function placeMissingPositions(document: ErDocument, missingIds: readonly
   const positions = { ...document.layout.positions };
   const { model } = document;
 
-  const placed = [...model.entities, ...model.relationships].filter((element) =>
-    isPositioned(document, element.id, missing),
-  );
+  const blockElements = [...model.entities, ...model.relationships, ...model.specializations];
+  const placed = blockElements.filter((element) => isPositioned(document, element.id, missing));
   const bottom = placed.reduce(
     (lowest, element) => Math.max(lowest, positions[element.id]?.y ?? 0),
     0,
@@ -182,7 +181,7 @@ export function placeMissingPositions(document: ErDocument, missingIds: readonly
   );
 
   let index = 0;
-  for (const element of [...model.entities, ...model.relationships]) {
+  for (const element of blockElements) {
     if (!missing.has(element.id)) {
       continue;
     }
