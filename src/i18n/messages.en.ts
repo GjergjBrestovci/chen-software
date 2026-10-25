@@ -200,16 +200,18 @@ export const messages = {
     foreignKey: 'Foreign key',
     keysAreEntityOnly: 'Only an entity attribute can be a key.',
     compositeHasParts: 'Delete its parts before changing the shape.',
-    specialization: 'Specialization',
+    /** Choosing a superclass over the selected entities is the general move. */
+    generalization: 'Generalization',
     specializationNotPossible: 'Only plain entities that belong to no specialization can be split.',
-    detachNeedsTwo: 'A specialization must keep at least two subclasses.',
+    detachNeedsTwo: 'An ISA must keep at least two specializations.',
     coverage: 'Coverage',
     total: 'Total',
     partial: 'Partial',
     overlap: 'Overlap',
     disjoint: 'Disjoint',
     nonDisjoint: 'Non-disjoint',
-    subclasses: 'Subclasses',
+    /** The listed subclasses are this superclass's specializations. */
+    specializations: 'Specializations',
   },
 
   /** The column panel: details only the SQL export uses. */

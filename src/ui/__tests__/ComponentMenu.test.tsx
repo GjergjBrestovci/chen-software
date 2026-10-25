@@ -482,7 +482,7 @@ describe('specialization from a selection', () => {
     const { person, student } = threeEntities();
     openAll([person, student]);
     renderMenu();
-    expect(screen.queryByRole('group', { name: 'Specialization' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Generalization' })).not.toBeInTheDocument();
   });
 
   it('splits the chosen superclass and selects the new triangle', async () => {

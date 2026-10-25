@@ -106,7 +106,7 @@ function SpecializationFromSelection({
   }
 
   return (
-    <MenuGroup label={messages.menu.specialization}>
+    <MenuGroup label={messages.menu.generalization}>
       {items.map((entity) => {
         const others = ids.filter((id) => id !== entity.id);
         return (
@@ -178,7 +178,7 @@ function SpecializationSection({
       </MenuGroup>
 
       {node !== undefined && (
-        <MenuGroup label={messages.menu.subclasses}>
+        <MenuGroup label={messages.menu.specializations}>
           {node.subIds.map((subId) => {
             const sub = findEntity(document.model, subId);
             const label =
