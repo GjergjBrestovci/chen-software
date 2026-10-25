@@ -10,6 +10,8 @@ import type { ElementKind, Id } from '../model/types';
  */
 export type ConnectionDecision =
   | { kind: 'create'; source: Id; target: Id }
+  /** Drop an entity on a specialization triangle to make it a subclass. */
+  | { kind: 'attach'; specId: Id; entityId: Id }
   | { kind: 'reject'; reason: 'self' | 'not-entities' }
   | { kind: 'ignore' };
 
@@ -33,7 +35,19 @@ export function decideConnect(input: ConnectInput): ConnectionDecision {
   if (input.source === input.target) {
     return { kind: 'reject', reason: 'self' };
   }
-  if (input.kindOf(input.source) !== 'entity' || input.kindOf(input.target) !== 'entity') {
+
+  const sourceKind = input.kindOf(input.source);
+  const targetKind = input.kindOf(input.target);
+  if (sourceKind === 'specialization' || targetKind === 'specialization') {
+    const specId = sourceKind === 'specialization' ? input.source : input.target;
+    const entityId = sourceKind === 'specialization' ? input.target : input.source;
+    if (input.kindOf(entityId) === 'entity') {
+      return { kind: 'attach', specId, entityId };
+    }
+    return { kind: 'reject', reason: 'not-entities' };
+  }
+
+  if (sourceKind !== 'entity' || targetKind !== 'entity') {
     return { kind: 'reject', reason: 'not-entities' };
   }
   return { kind: 'create', source: input.source, target: input.target };
@@ -60,7 +74,7 @@ export function decideConnectEnd(input: ConnectEndInput): ConnectionDecision {
   if (input.relationshipModeActive || input.handledByHandle) {
     return IGNORE;
   }
-  if (input.source === undefined || input.kindOf(input.source) !== 'entity') {
+  if (input.source === undefined) {
     return IGNORE;
   }
   if (input.target === undefined) {
@@ -69,6 +83,21 @@ export function decideConnectEnd(input: ConnectEndInput): ConnectionDecision {
   }
   if (input.target === input.source) {
     // What a plain click on a handle looks like. Not worth a message.
+    return IGNORE;
+  }
+
+  const sourceKind = input.kindOf(input.source);
+  const targetKind = input.kindOf(input.target);
+  if (sourceKind === 'specialization' || targetKind === 'specialization') {
+    const specId = sourceKind === 'specialization' ? input.source : input.target;
+    const entityId = sourceKind === 'specialization' ? input.target : input.source;
+    if (input.kindOf(entityId) === 'entity') {
+      return { kind: 'attach', specId, entityId };
+    }
+    return IGNORE;
+  }
+
+  if (sourceKind !== 'entity' || targetKind !== 'entity') {
     return IGNORE;
   }
   return { kind: 'create', source: input.source, target: input.target };

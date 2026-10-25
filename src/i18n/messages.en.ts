@@ -83,6 +83,7 @@ export const messages = {
     attributeNeedsOwner:
       'Select one entity, relationship or composite attribute first, then press A.',
     attributeNotComposite: 'Only a composite attribute has parts. Make it composite first.',
+    attachUnfit: 'Only a plain entity that belongs to no specialization can join a triangle.',
   },
 
   pdf: {
