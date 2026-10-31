@@ -16,7 +16,7 @@ export function ChenEdge({ data }: ChenEdgeProps): ReactElement | null {
     return null;
   }
 
-  const { segment, label } = data;
+  const { segment, label, arrow } = data;
 
   return (
     <>
@@ -27,6 +27,12 @@ export function ChenEdge({ data }: ChenEdgeProps): ReactElement | null {
         x2={segment.end.x}
         y2={segment.end.y}
       />
+      {arrow && (
+        <polygon
+          className="chen-arrow"
+          points={`${arrow.tip.x},${arrow.tip.y} ${arrow.left.x},${arrow.left.y} ${arrow.right.x},${arrow.right.y}`}
+        />
+      )}
       {label && (
         <EdgeLabelRenderer>
           <CardinalityChip label={label} />

@@ -15,6 +15,7 @@ export const DEFAULT_THEME: ComponentTheme = {
   entity: null,
   relationship: null,
   attribute: null,
+  specialization: null,
 };
 
 /**

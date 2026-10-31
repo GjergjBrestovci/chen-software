@@ -7,7 +7,7 @@ import {
   textBaselineOffset,
   underlineMetrics,
 } from '../geometry';
-import type { EdgeSegment, ShapeBox } from '../geometry';
+import type { ArrowHead, EdgeSegment, ShapeBox } from '../geometry';
 import { FILL_OPACITY } from '../model/presentation';
 import type { Drawing, DrawnLabel, DrawnShape } from './drawing';
 
@@ -83,9 +83,19 @@ function outline(box: ShapeBox, stroke: string, fill: string, extra: string): st
       return `<rect x="${n(x - halfWidth)}" y="${n(y - halfHeight)}" width="${n(box.size.width)}" height="${n(box.size.height)}" ${paint}/>`;
     case 'ellipse':
       return `<ellipse cx="${n(x)}" cy="${n(y)}" rx="${n(halfWidth)}" ry="${n(halfHeight)}" ${paint}/>`;
+    case 'triangle':
+      // Apex up, base across the bottom: the ISA node's outline.
+      return `<polygon points="${n(x)},${n(y - halfHeight)} ${n(x + halfWidth)},${n(y + halfHeight)} ${n(x - halfWidth)},${n(y + halfHeight)}" ${paint}/>`;
     case 'diamond':
       return `<polygon points="${n(x)},${n(y - halfHeight)} ${n(x + halfWidth)},${n(y)} ${n(x)},${n(y + halfHeight)} ${n(x - halfWidth)},${n(y)}" ${paint}/>`;
   }
+}
+
+function arrowMarkup(arrow: ArrowHead): string {
+  const points = `${n(arrow.tip.x)},${n(arrow.tip.y)} ${n(arrow.left.x)},${n(arrow.left.y)} ${n(
+    arrow.right.x,
+  )},${n(arrow.right.y)}`;
+  return `<polygon points="${points}" fill="${INK}"/>`;
 }
 
 function shapeMarkup(shape: DrawnShape, standardNotation: boolean): string {
@@ -138,7 +148,10 @@ function labelMarkup(label: DrawnLabel): string {
   const style =
     label.kind === 'cardinality'
       ? `font-weight="bold" fill="${INK}"`
-      : `font-style="italic" fill="${ROLE_INK}"`;
+      : label.kind === 'role'
+        ? `font-style="italic" fill="${ROLE_INK}"`
+        : // The (t,d) text is notation: upright ink, like the shapes it names.
+          `fill="${INK}"`;
   return `<text x="${n(label.position.x)}" y="${n(baseline)}" font-family="${FONT_FAMILY}" font-size="${n(label.fontSize)}" text-anchor="middle" ${style}>${escapeXml(label.text)}</text>`;
 }
 
@@ -159,10 +172,12 @@ export function renderSvg(drawing: Drawing, options: SvgOptions = {}): RenderedS
   const width = drawing.bounds.maxX - drawing.bounds.minX + 2 * padding;
   const height = drawing.bounds.maxY - drawing.bounds.minY + 2 * padding;
 
-  // Lines first, so shapes sit on top of the ends that meet them.
+  // Lines first, so shapes sit on top of the ends that meet them; the
+  // arrowheads come after the shapes so no fill ever clips a tip.
   const body = [
     ...drawing.lines.map(line),
     ...drawing.shapes.map((shape) => shapeMarkup(shape, standardNotation)),
+    ...drawing.arrows.map(arrowMarkup),
     ...drawing.labels.map(labelMarkup),
   ].join('');
 

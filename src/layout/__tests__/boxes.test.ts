@@ -8,6 +8,7 @@ import {
 } from '../../model/operations';
 import type { ErDocument } from '../../model/types';
 import { absoluteBoxes } from '../boxes';
+import { shapeKindFor } from '../types';
 
 function nested(): ErDocument {
   let document = createEmptyDocument();
@@ -103,5 +104,11 @@ describe('absoluteBoxes', () => {
 
   it('is empty for an empty diagram', () => {
     expect(absoluteBoxes(createEmptyDocument()).size).toBe(0);
+  });
+});
+
+describe('shapeKindFor', () => {
+  it('draws a specialization as an apex-up triangle', () => {
+    expect(shapeKindFor('specialization')).toBe('triangle');
   });
 });

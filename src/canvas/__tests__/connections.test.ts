@@ -7,6 +7,7 @@ const KINDS: Record<string, ElementKind> = {
   author: 'entity',
   writes: 'relationship',
   isbn: 'attribute',
+  isa: 'specialization',
 };
 const kindOf = (id: string): ElementKind | undefined => KINDS[id];
 
@@ -103,6 +104,54 @@ describe('decideConnectEnd', () => {
     });
     expect(decideConnectEnd({ ...base, source: undefined, target: 'author' })).toEqual({
       kind: 'ignore',
+    });
+  });
+
+  it('attaches an entity dropped on a specialization triangle', () => {
+    expect(decideConnectEnd({ ...base, source: 'author', target: 'isa' })).toEqual({
+      kind: 'attach',
+      specId: 'isa',
+      entityId: 'author',
+    });
+  });
+
+  it('attaches whichever end is the triangle, however the drag ran', () => {
+    expect(decideConnectEnd({ ...base, source: 'isa', target: 'author' })).toEqual({
+      kind: 'attach',
+      specId: 'isa',
+      entityId: 'author',
+    });
+  });
+});
+
+describe('decideConnect with specialization triangles', () => {
+  const base = { relationshipModeActive: false, kindOf };
+
+  it('attaches a handle-completed entity-to-triangle connection', () => {
+    expect(decideConnect({ ...base, source: 'book', target: 'isa' })).toEqual({
+      kind: 'attach',
+      specId: 'isa',
+      entityId: 'book',
+    });
+    expect(decideConnect({ ...base, source: 'isa', target: 'book' })).toEqual({
+      kind: 'attach',
+      specId: 'isa',
+      entityId: 'book',
+    });
+  });
+
+  it('refuses triangle-to-triangle and triangle-to-anything-strange', () => {
+    expect(decideConnect({ ...base, source: 'isa', target: 'isa' })).toEqual({
+      kind: 'reject',
+      reason: 'self',
+    });
+    expect(decideConnect({ ...base, source: 'isa', target: 'writes' })).toEqual({
+      kind: 'reject',
+      reason: 'not-entities',
+    });
+    expect(decideConnect({ ...base, source: 'isbn', target: 'isa' })).toEqual({
+      kind: 'reject',
+      reason: 'not-entities',
     });
   });
 });

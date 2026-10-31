@@ -4,6 +4,7 @@ import {
   addAttribute,
   addEntity,
   addRelationship,
+  addSpecialization,
   createEmptyDocument,
   setCardinality,
 } from '../../model/operations';
@@ -61,6 +62,10 @@ function outlineResidual(shape: ShapeBox, point: Point): number {
       return Math.abs(dx + dy - 1);
     case 'ellipse':
       return Math.abs(Math.hypot(dx, dy) - 1);
+    case 'triangle': {
+      const sy = (point.y - shape.center.y) / (shape.size.height / 2);
+      return Math.abs(Math.max(2 * dx - sy, sy) - 1);
+    }
   }
 }
 
@@ -468,5 +473,103 @@ describe('buildScene places composite attributes', () => {
     // Neither the composite nor the part below it can be positioned.
     expect(nodes.map((node) => node.id)).toEqual(['book']);
     expect(edges).toEqual([]);
+  });
+});
+
+describe('specializations in the scene', () => {
+  /** PERSON above, STUDENT and TEACHER below, triangle between. */
+  function zoo(): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'person', name: 'PERSON', position: { x: 200, y: 0 } });
+    document = addEntity(document, { id: 'student', name: 'STUDENT', position: { x: 0, y: 300 } });
+    document = addEntity(document, {
+      id: 'teacher',
+      name: 'TEACHER',
+      position: { x: 400, y: 300 },
+    });
+    document = addSpecialization(document, {
+      id: 'isa',
+      superId: 'person',
+      subIds: ['student', 'teacher'],
+      coverage: 'partial',
+      overlap: 'disjoint',
+      position: { x: 200, y: 140 },
+    });
+    return document;
+  }
+
+  it('draws the triangle node with the fixed label and the constraint text', () => {
+    const { nodes } = scene(zoo());
+    const spec = nodes.find((node) => node.id === 'isa');
+    expect(spec?.type).toBe('specialization');
+    if (spec?.type !== 'specialization') {
+      throw new Error('scene lost the triangle');
+    }
+    expect(spec.data.label).toBe('ISA');
+    expect(spec.data.constraint).toBe('(p,d)');
+    expect(spec.width).toBe(shapeSizeFor('triangle', 'ISA').width);
+    expect(spec.height).toBe(shapeSizeFor('triangle', 'ISA').height);
+  });
+
+  it('places the triangle box for edge geometry', () => {
+    const { boxes } = scene(zoo());
+    expect(boxes.get('isa')?.kind).toBe('triangle');
+  });
+
+  it('links the superclass and every subclass to the triangle', () => {
+    const { edges } = scene(zoo());
+    const isaEdges = edges.filter((edge) => edge.id.startsWith('isa:isa:'));
+    expect(isaEdges.map((edge) => [edge.source, edge.target].sort().join('>')).sort()).toEqual([
+      'isa>person',
+      'isa>student',
+      'isa>teacher',
+    ]);
+    for (const edge of isaEdges) {
+      expect(edge.selectable).toBe(false);
+      expect(edge.data?.label).toBeNull();
+    }
+  });
+
+  it('points an arrowhead at the superclass only', () => {
+    const { edges } = scene(zoo());
+    const isaEdges = edges.filter((edge) => edge.id.startsWith('isa:isa:'));
+    const superEdge = isaEdges.find((edge) => edge.target === 'isa');
+    const subEdges = isaEdges.filter((edge) => edge.source === 'isa');
+
+    const arrow = superEdge?.data?.arrow;
+    if (arrow === null || arrow === undefined) {
+      throw new Error('the superclass link lost its arrowhead');
+    }
+    // The tip touches the superclass boundary the line starts from.
+    if (superEdge?.data) {
+      expect(arrow.tip).toEqual(superEdge.data.segment.start);
+    }
+    expect(subEdges.length).toBeGreaterThan(0);
+    for (const edge of subEdges) {
+      expect(edge.data?.arrow).toBeNull();
+    }
+    // Every other link in the scene has no arrowheads at all.
+    for (const edge of edges.filter((candidate) => !candidate.id.startsWith('isa:'))) {
+      expect(edge.data?.arrow).toBeNull();
+    }
+  });
+
+  it('carries selection to the triangle', () => {
+    const { nodes } = scene(zoo(), { selectedIds: ['isa'] });
+    expect(nodes.find((node) => node.id === 'isa')?.selected).toBe(true);
+  });
+
+  it('follows the specialization theme colour', () => {
+    const themed: ErDocument = {
+      ...zoo(),
+      presentation: {
+        ...zoo().presentation,
+        theme: { ...zoo().presentation.theme, specialization: '#7c3aed' },
+      },
+    };
+    const { nodes } = scene(themed);
+    const spec = nodes.find((node) => node.id === 'isa');
+    if (spec?.type !== 'specialization') throw new Error('scene lost the triangle');
+    expect(spec.data.color).toBe('#7c3aed');
   });
 });

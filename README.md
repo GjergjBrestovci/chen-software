@@ -14,6 +14,10 @@ diagram is autosaved locally.
   attributes (simple, composite, multivalued, derived)
 - Keys and partial keys, cardinalities (`1`, `N`, `M`) and total or partial
   participation
+- Generalization and specialization: entities grouped under a superclass, or
+  a superclass split into specializations — marked total or partial and
+  disjoint or non-disjoint, drawn as the classic ISA triangle with an arrow
+  pointing at the superclass
 - Drag, pan, zoom, snap to grid, multi-select, undo and redo
 - Light and dark theme, with a colour per component
 - Save and open diagrams as `.erd.json` files

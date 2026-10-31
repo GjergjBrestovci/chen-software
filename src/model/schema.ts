@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { messages } from '../i18n/messages.en';
 import { SQL_TYPES } from './column';
-import { allElementIds, rootOwnerOf } from './queries';
+import { allElementIds, findEntity, isAncestorOf, rootOwnerOf } from './queries';
 import type { ErDocument, Id } from './types';
 
 /**
@@ -77,10 +77,39 @@ const relationshipSchema = z.strictObject({
   ends: z.array(relationshipEndSchema).min(2),
 });
 
+const specializationSchema = z.strictObject({
+  id: idSchema,
+  superId: idSchema,
+  subIds: z.array(idSchema).min(2),
+  coverage: z.enum(['partial', 'total']),
+  overlap: z.enum(['disjoint', 'non-disjoint']),
+});
+
 export const erModelSchema = z.strictObject({
   entities: z.array(entitySchema),
   attributes: z.array(attributeSchema),
   relationships: z.array(relationshipSchema),
+  specializations: z.array(specializationSchema),
+});
+
+/**
+ * The model and presentation version 3 wrote: today's shapes without
+ * `specializations` and its theme colour. `persistence/migrations.ts` validates
+ * old files against these before upgrading them.
+ */
+export const erModelV3Schema = z.strictObject({
+  entities: z.array(entitySchema),
+  attributes: z.array(attributeSchema),
+  relationships: z.array(relationshipSchema),
+});
+
+export const presentationV3Schema = z.strictObject({
+  theme: z.strictObject({
+    entity: colorSchema.nullable(),
+    relationship: colorSchema.nullable(),
+    attribute: colorSchema.nullable(),
+  }),
+  colors: z.record(z.string(), colorSchema),
 });
 
 const layoutSchema = z.strictObject({
@@ -92,12 +121,13 @@ const presentationSchema = z.strictObject({
     entity: colorSchema.nullable(),
     relationship: colorSchema.nullable(),
     attribute: colorSchema.nullable(),
+    specialization: colorSchema.nullable(),
   }),
   colors: z.record(z.string(), colorSchema),
 });
 
 export const erDocumentSchema = z.strictObject({
-  version: z.literal(3),
+  version: z.literal(4),
   title: z.string(),
   model: erModelSchema,
   layout: layoutSchema,
@@ -106,7 +136,7 @@ export const erDocumentSchema = z.strictObject({
 });
 
 /** The format version this build writes, and reads without migration. */
-export const CURRENT_VERSION = 3;
+export const CURRENT_VERSION = 4;
 
 const versionProbeSchema = z.object({ version: z.number() });
 
@@ -170,6 +200,52 @@ function checkIntegrity(document: ErDocument): string | null {
     for (const end of relationship.ends) {
       if (!entityIds.has(end.entityId)) {
         return messages.file.unknownRelationshipEntity(describe(relationship.name));
+      }
+    }
+  }
+
+  const supersSeen = new Set<Id>();
+  const subsSeen = new Set<Id>();
+
+  for (const spec of document.model.specializations) {
+    const superEntity = findEntity(document.model, spec.superId);
+    if (superEntity === undefined || spec.subIds.some((subId) => !entityIds.has(subId))) {
+      return messages.file.unknownSpecializationElement(describe(superEntity?.name ?? ''));
+    }
+    if (new Set(spec.subIds).size !== spec.subIds.length) {
+      return messages.file.specializationDuplicateSub(describe(superEntity.name));
+    }
+    if (spec.subIds.includes(spec.superId)) {
+      return messages.file.specializationSelfSub(describe(superEntity.name));
+    }
+    if (superEntity.kind === 'weak') {
+      return messages.file.specializationWeak(describe(superEntity.name));
+    }
+    if (supersSeen.has(spec.superId)) {
+      return messages.file.specializationSuperTwice(describe(superEntity.name));
+    }
+    supersSeen.add(spec.superId);
+
+    for (const subId of spec.subIds) {
+      const subEntity = findEntity(document.model, subId);
+      if (subEntity === undefined) {
+        return messages.file.unknownSpecializationElement(describe(superEntity.name));
+      }
+      if (subEntity.kind === 'weak') {
+        return messages.file.specializationWeak(describe(subEntity.name));
+      }
+      if (subsSeen.has(subId)) {
+        return messages.file.specializationSubTwice(describe(subEntity.name));
+      }
+      subsSeen.add(subId);
+    }
+
+    // A chain of subclasses leading back to its own superclass cannot be drawn,
+    // and the SQL export would follow it forever.
+    for (const subId of spec.subIds) {
+      if (isAncestorOf(document.model, subId, spec.superId)) {
+        const subEntity = findEntity(document.model, subId);
+        return messages.file.specializationCycle(describe(subEntity?.name ?? ''));
       }
     }
   }

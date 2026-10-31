@@ -2,6 +2,7 @@ import {
   addAttribute,
   addEntity,
   addRelationship,
+  addSpecialization,
   createEmptyDocument,
   setAttributeColumn,
   setCardinality,
@@ -19,6 +20,7 @@ import type {
   Id,
   Participation,
   RelationshipKind,
+  SpecializationOverlap,
 } from '../../model/types';
 import type { Column, RelationalSchema, Table } from '../types';
 
@@ -104,6 +106,22 @@ export class Diagram {
           role: options.role,
         });
       }
+    });
+    return this;
+  }
+
+  isa(
+    superId: Id,
+    subIds: readonly Id[],
+    options: { coverage?: Participation; overlap?: SpecializationOverlap } = {},
+  ): this {
+    this.document = addSpecialization(this.document, {
+      id: `isa_${superId}`,
+      superId,
+      subIds,
+      coverage: options.coverage ?? 'partial',
+      overlap: options.overlap ?? 'disjoint',
+      position: origin,
     });
     return this;
   }

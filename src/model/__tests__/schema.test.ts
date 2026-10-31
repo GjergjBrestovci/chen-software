@@ -3,7 +3,7 @@ import type { z } from 'zod';
 import { CURRENT_VERSION, parseErDocument } from '../schema';
 import type { erDocumentSchema } from '../schema';
 import { createEmptyDocument } from '../operations';
-import type { Attribute, ErDocument } from '../types';
+import type { Attribute, ErDocument, Specialization } from '../types';
 import { readFixture } from './readFixture';
 
 /** The zod schema and the hand-written types must not drift apart. */
@@ -62,7 +62,7 @@ describe('parseErDocument', () => {
   });
 
   it('exposes the current version', () => {
-    expect(CURRENT_VERSION).toBe(3);
+    expect(CURRENT_VERSION).toBe(4);
   });
 });
 
@@ -366,5 +366,164 @@ describe('parseErDocument tolerates missing layout positions', () => {
       }),
     );
     expect(outcome.ok).toBe(true);
+  });
+});
+
+describe('parseErDocument checks specializations', () => {
+  /** One ISA node over the bookstore fixture: BOOK splits into AUTHOR and GENRE. */
+  function specialization(changes: Partial<Specialization> = {}): Specialization {
+    return {
+      id: 'isa_test',
+      superId: 'ent_book',
+      subIds: ['ent_author', 'ent_genre'],
+      coverage: 'partial',
+      overlap: 'disjoint',
+      ...changes,
+    };
+  }
+
+  function withSpecializations(...specs: Specialization[]): unknown {
+    return corrupted((document) => {
+      document.model.specializations.push(...specs);
+    });
+  }
+
+  it('accepts a specialization and reports its missing position', () => {
+    const outcome = parseErDocument(withSpecializations(specialization()));
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.value.document.model.specializations).toHaveLength(1);
+    expect(outcome.value.missingPositionIds).toContain('isa_test');
+  });
+
+  it('accepts every combination of coverage and overlap', () => {
+    for (const coverage of ['partial', 'total'] as const) {
+      for (const overlap of ['disjoint', 'non-disjoint'] as const) {
+        const outcome = parseErDocument(withSpecializations(specialization({ coverage, overlap })));
+        expect(outcome.ok).toBe(true);
+      }
+    }
+  });
+
+  it('rejects a specialization with fewer than two subclasses', () => {
+    expectRejected(withSpecializations(specialization({ subIds: ['ent_author'] })));
+  });
+
+  it('rejects a specialization that lists the same subclass twice', () => {
+    const message = expectRejected(
+      withSpecializations(specialization({ subIds: ['ent_author', 'ent_author'] })),
+    );
+    expect(message).toContain('twice');
+  });
+
+  it('rejects a specialization whose superclass is missing', () => {
+    const message = expectRejected(withSpecializations(specialization({ superId: 'ghost' })));
+    expect(message).toContain('missing');
+  });
+
+  it('rejects a specialization with a missing subclass', () => {
+    expectRejected(withSpecializations(specialization({ subIds: ['ent_author', 'ghost'] })));
+  });
+
+  it('rejects a superclass that is also one of its own subclasses', () => {
+    const message = expectRejected(
+      withSpecializations(specialization({ subIds: ['ent_book', 'ent_author'] })),
+    );
+    expect(message).toContain('BOOK');
+  });
+
+  it('rejects an entity that is a subclass in two specializations', () => {
+    const message = expectRejected(
+      withSpecializations(
+        specialization({
+          id: 'isa_a',
+          superId: 'ent_publisher',
+          subIds: ['ent_book', 'ent_author'],
+        }),
+        specialization({
+          id: 'isa_b',
+          superId: 'ent_genre',
+          subIds: ['ent_author', 'ent_publisher'],
+        }),
+      ),
+    );
+    expect(message).toContain('AUTHOR');
+  });
+
+  it('rejects a superclass split by two specializations', () => {
+    const message = expectRejected(
+      corrupted((document) => {
+        document.model.entities.push({ id: 'ent_shelf', name: 'SHELF', kind: 'regular' });
+        document.model.specializations.push(
+          specialization(),
+          specialization({ id: 'isa_b', subIds: ['ent_publisher', 'ent_shelf'] }),
+        );
+      }),
+    );
+    expect(message).toContain('BOOK');
+  });
+
+  it('rejects a specialization that leads back to itself', () => {
+    const message = expectRejected(
+      withSpecializations(
+        specialization(),
+        specialization({
+          id: 'isa_b',
+          superId: 'ent_author',
+          subIds: ['ent_book', 'ent_publisher'],
+        }),
+      ),
+    );
+    expect(message).toContain('itself');
+  });
+
+  it('accepts a two-level chain: subclass of one node, superclass of the next', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        document.model.entities.push({ id: 'ent_shelf', name: 'SHELF', kind: 'regular' });
+        document.model.specializations.push(
+          specialization(),
+          specialization({
+            id: 'isa_b',
+            superId: 'ent_author',
+            subIds: ['ent_publisher', 'ent_shelf'],
+          }),
+        );
+      }),
+    );
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('rejects a weak superclass', () => {
+    const message = expectRejected(
+      corrupted((document) => {
+        document.model.specializations.push(specialization());
+        const book = document.model.entities.find((entity) => entity.id === 'ent_book');
+        if (book) book.kind = 'weak';
+      }),
+    );
+    expect(message).toContain('weak');
+  });
+
+  it('rejects a weak subclass', () => {
+    expectRejected(
+      corrupted((document) => {
+        document.model.specializations.push(specialization());
+        const author = document.model.entities.find((entity) => entity.id === 'ent_author');
+        if (author) author.kind = 'weak';
+      }),
+    );
+  });
+
+  it('rejects an unknown coverage', () => {
+    expectRejected(
+      withSpecializations(specialization({ coverage: 'derived' as Specialization['coverage'] })),
+    );
+  });
+
+  it('rejects an unknown overlap', () => {
+    expectRejected(
+      withSpecializations(specialization({ overlap: 'open' as Specialization['overlap'] })),
+    );
   });
 });

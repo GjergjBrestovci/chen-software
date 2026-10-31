@@ -23,6 +23,10 @@ function outlineResidual(shape: ShapeBox, point: Point): number {
       return Math.abs(dx + dy - 1);
     case 'ellipse':
       return Math.abs(Math.hypot(dx, dy) - 1);
+    case 'triangle': {
+      const sy = (point.y - shape.center.y) / (shape.size.height / 2);
+      return Math.abs(Math.max(2 * dx - sy, sy) - 1);
+    }
   }
 }
 

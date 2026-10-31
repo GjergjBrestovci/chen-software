@@ -4,15 +4,18 @@
    not. These must stay `type`. */
 import type { Edge, Node } from '@xyflow/react';
 import {
+  arrowHeadAt,
   boxFromTopLeft,
   cardinalityLabelPlacement,
   floatingEdge,
   shapeSizeFor,
   topLeftOf,
 } from '../geometry';
-import type { EdgeSegment, Point, ShapeBox, Size } from '../geometry';
+import type { ArrowHead, EdgeSegment, Point, ShapeBox, Size } from '../geometry';
 import { ANCHOR_HANDLE_ID } from './nodes/AnchorHandle';
+import { messages } from '../i18n/messages.en';
 import { colorFor } from '../model/presentation';
+import { isaConstraintText } from '../model/queries';
 import type {
   Attribute,
   Cardinality,
@@ -70,10 +73,23 @@ export type AttributeNodeData = {
   isComposite: boolean;
 };
 
+/**
+ * The ISA triangle. `label` is the fixed word ISA — specializations have no
+ * name, so `renaming` is always false — and `constraint` is the course
+ * notation text drawn above the apex.
+ */
+export type SpecializationNodeData = {
+  label: string;
+  renaming: boolean;
+  color: ComponentColor;
+  constraint: string;
+};
+
 export type AppNode =
   | Node<EntityNodeData, 'entity'>
   | Node<RelationshipNodeData, 'relationship'>
-  | Node<AttributeNodeData, 'attribute'>;
+  | Node<AttributeNodeData, 'attribute'>
+  | Node<SpecializationNodeData, 'specialization'>;
 
 export type CardinalityLabel = {
   relationshipId: Id;
@@ -86,6 +102,8 @@ export type ChenEdgeData = {
   segment: EdgeSegment;
   /** Present on relationship edges, absent on attribute-to-owner lines. */
   label: CardinalityLabel | null;
+  /** The ISA link to a superclass carries an arrowhead pointing at it. */
+  arrow: ArrowHead | null;
 };
 
 export type AppEdge = Edge<ChenEdgeData, 'chen'>;
@@ -133,6 +151,11 @@ export function attributeEdgeId(attributeId: Id): string {
   return `attr:${attributeId}`;
 }
 
+/** The line between an ISA triangle and one of its participants. */
+export function isaEdgeId(specId: Id, otherId: Id): string {
+  return `isa:${specId}:${otherId}`;
+}
+
 export function buildScene(input: SceneInput): Scene {
   const { document, renamingId } = input;
   const { model, layout, presentation } = document;
@@ -165,6 +188,28 @@ export function buildScene(input: SceneInput): Scene {
       },
     });
     boxes.set(entity.id, boxFromTopLeft('rect', position, size));
+  }
+
+  const specName = messages.element.specialization;
+  for (const spec of model.specializations) {
+    const size = shapeSizeFor('triangle', specName);
+    const position = positionOf(spec.id);
+    nodes.push({
+      id: spec.id,
+      type: 'specialization',
+      position,
+      width: size.width,
+      height: size.height,
+      measured: declaredSize(size),
+      selected: selected.has(spec.id),
+      data: {
+        label: specName,
+        renaming: false,
+        color: colorFor(presentation, spec.id, 'specialization'),
+        constraint: isaConstraintText(spec.coverage, spec.overlap),
+      },
+    });
+    boxes.set(spec.id, boxFromTopLeft('triangle', position, size));
   }
 
   for (const relationship of model.relationships) {
@@ -267,8 +312,51 @@ export function buildScene(input: SceneInput): Scene {
       sourceHandle: ANCHOR_HANDLE_ID,
       targetHandle: ANCHOR_HANDLE_ID,
       selectable: false,
-      data: { segment: floatingEdge(box, ownerBox), label: null },
+      data: { segment: floatingEdge(box, ownerBox), label: null, arrow: null },
     });
+  }
+
+  for (const spec of model.specializations) {
+    const triangle = boxes.get(spec.id);
+    if (triangle === undefined) {
+      continue;
+    }
+    const superBox = boxes.get(spec.superId);
+    if (superBox !== undefined) {
+      const superLink = floatingEdge(superBox, triangle);
+      edges.push({
+        id: isaEdgeId(spec.id, spec.superId),
+        type: 'chen',
+        source: spec.superId,
+        target: spec.id,
+        sourceHandle: ANCHOR_HANDLE_ID,
+        targetHandle: ANCHOR_HANDLE_ID,
+        selectable: false,
+        // The line starts on the superclass's outline; the arrow points back
+        // along it, so the tip touches the superclass.
+        data: {
+          segment: superLink,
+          label: null,
+          arrow: arrowHeadAt(superLink.start, superLink.end),
+        },
+      });
+    }
+    for (const subId of spec.subIds) {
+      const subBox = boxes.get(subId);
+      if (subBox === undefined) {
+        continue;
+      }
+      edges.push({
+        id: isaEdgeId(spec.id, subId),
+        type: 'chen',
+        source: spec.id,
+        target: subId,
+        sourceHandle: ANCHOR_HANDLE_ID,
+        targetHandle: ANCHOR_HANDLE_ID,
+        selectable: false,
+        data: { segment: floatingEdge(triangle, subBox), label: null, arrow: null },
+      });
+    }
   }
 
   for (const { relationship, box: diamond } of placedRelationships) {
@@ -296,6 +384,7 @@ export function buildScene(input: SceneInput): Scene {
             value: end.cardinality,
             position: placement.position,
           },
+          arrow: null,
         },
       });
     });

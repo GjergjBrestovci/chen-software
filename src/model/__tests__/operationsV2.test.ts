@@ -5,9 +5,13 @@ import {
   addEntity,
   addRelationship,
   addRelationshipEnd,
+  addSpecialization,
+  addSpecializationSub,
   createEmptyDocument,
   deleteElements,
   removeRelationshipEnd,
+  removeSpecializationSub,
+  renameElement,
   setAttributeColumn,
   setAttributeForeignKey,
   setAttributeIdentifier,
@@ -17,6 +21,8 @@ import {
   setEntityKind,
   setParticipation,
   setRelationshipKind,
+  setSpecializationCoverage,
+  setSpecializationOverlap,
   setTheme,
   wouldCycle,
 } from '../operations';
@@ -317,6 +323,7 @@ describe('colour', () => {
       entity: '#b91c1c',
       relationship: '#b91c1c',
       attribute: '#b91c1c',
+      specialization: '#b91c1c',
     });
     expect(colorFor(document.presentation, 'dept', 'entity')).toBe('#2563eb');
     expect(colorFor(document.presentation, 'course', 'entity')).toBe('#b91c1c');
@@ -358,5 +365,319 @@ describe('cascade edge cases', () => {
   it('copes with a part listed before its composite', () => {
     const document = deleteElements(sample(), ['first', 'name']);
     expect(document.model.attributes).toEqual([]);
+  });
+});
+
+describe('specialization guards', () => {
+  /** PERSON → isa → STUDENT/TEACHER, as a stored model; creation ops come later. */
+  function withIsa(): ErDocument {
+    let document = createEmptyDocument();
+    document = addEntity(document, { id: 'person', name: 'PERSON', position: origin });
+    document = addEntity(document, { id: 'student', name: 'STUDENT', position: origin });
+    document = addEntity(document, { id: 'teacher', name: 'TEACHER', position: origin });
+    return {
+      ...document,
+      model: {
+        ...document.model,
+        specializations: [
+          {
+            id: 'isa',
+            superId: 'person',
+            subIds: ['student', 'teacher'],
+            coverage: 'partial',
+            overlap: 'disjoint',
+          },
+        ],
+      },
+    };
+  }
+
+  it('refuses to rename a specialization, which has no name', () => {
+    expect(() => renameElement(withIsa(), { id: 'isa', name: 'oops' })).toThrow(ModelError);
+  });
+
+  it('refuses attributes hanging off a specialization', () => {
+    expect(() =>
+      addAttribute(withIsa(), { id: 'attr', ownerId: 'isa', name: 'x', offset: origin }),
+    ).toThrow(ModelError);
+  });
+
+  it('treats a specialization id as taken when adding entities', () => {
+    expect(() => addEntity(withIsa(), { id: 'isa', name: 'GHOST', position: origin })).toThrow(
+      ModelError,
+    );
+  });
+});
+
+describe('specialization operations', () => {
+  /** PERSON → STUDENT/TEACHER/ADVISOR/ASSISTANT, all regular, all unnamed splits. */
+  function zoo(): ErDocument {
+    let document = createEmptyDocument();
+    const names = ['PERSON', 'STUDENT', 'TEACHER', 'ADVISOR', 'ASSISTANT'];
+    for (const name of names) {
+      document = addEntity(document, {
+        id: name.toLowerCase(),
+        name,
+        position: origin,
+      });
+    }
+    return document;
+  }
+
+  /** PERSON splits into STUDENT and TEACHER. */
+  function withIsa(document: ErDocument = zoo()): ErDocument {
+    return addSpecialization(document, {
+      id: 'isa',
+      superId: 'person',
+      subIds: ['student', 'teacher'],
+      position: { x: 10, y: 20 },
+    });
+  }
+
+  it('adds a specialization defaulting to partial and disjoint, with a position', () => {
+    const document = withIsa();
+    expect(document.model.specializations[0]).toEqual({
+      id: 'isa',
+      superId: 'person',
+      subIds: ['student', 'teacher'],
+      coverage: 'partial',
+      overlap: 'disjoint',
+    });
+    expect(document.layout.positions['isa']).toEqual({ x: 10, y: 20 });
+  });
+
+  it('keeps coverage and overlap when given', () => {
+    const document = addSpecialization(zoo(), {
+      id: 'isa',
+      superId: 'person',
+      subIds: ['student', 'teacher'],
+      coverage: 'total',
+      overlap: 'non-disjoint',
+      position: origin,
+    });
+    expect(document.model.specializations[0]).toMatchObject({
+      coverage: 'total',
+      overlap: 'non-disjoint',
+    });
+  });
+
+  it('refuses an id that any element already uses', () => {
+    expect(() => addEntity(withIsa(), { id: 'isa', name: 'GHOST', position: origin })).toThrow(
+      ModelError,
+    );
+  });
+
+  it('refuses fewer than two subclasses', () => {
+    expect(() =>
+      addSpecialization(zoo(), {
+        id: 'isa',
+        superId: 'person',
+        subIds: ['student'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('refuses the same subclass listed twice', () => {
+    expect(() =>
+      addSpecialization(zoo(), {
+        id: 'isa',
+        superId: 'person',
+        subIds: ['student', 'student'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('refuses a superclass that is also one of its subclasses', () => {
+    expect(() =>
+      addSpecialization(zoo(), {
+        id: 'isa',
+        superId: 'person',
+        subIds: ['person', 'student'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('refuses unknown participants', () => {
+    expect(() =>
+      addSpecialization(zoo(), {
+        id: 'isa',
+        superId: 'ghost',
+        subIds: ['student', 'teacher'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+    expect(() =>
+      addSpecialization(zoo(), {
+        id: 'isa',
+        superId: 'person',
+        subIds: ['student', 'ghost'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('refuses weak entities on either side', () => {
+    const weakSuper = setEntityKind(zoo(), 'person', 'weak');
+    expect(() =>
+      addSpecialization(weakSuper, {
+        id: 'isa',
+        superId: 'person',
+        subIds: ['student', 'teacher'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+
+    const weakSub = setEntityKind(zoo(), 'student', 'weak');
+    expect(() =>
+      addSpecialization(weakSub, {
+        id: 'isa',
+        superId: 'person',
+        subIds: ['student', 'teacher'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('refuses to split a superclass that is already split', () => {
+    expect(() =>
+      addSpecialization(withIsa(), {
+        id: 'isa2',
+        superId: 'person',
+        subIds: ['advisor', 'assistant'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('refuses a subclass that belongs to another specialization', () => {
+    expect(() =>
+      addSpecialization(withIsa(), {
+        id: 'isa2',
+        superId: 'advisor',
+        subIds: ['student', 'assistant'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('refuses a chain that leads back to its own superclass', () => {
+    expect(() =>
+      addSpecialization(withIsa(), {
+        id: 'isa2',
+        superId: 'student',
+        subIds: ['person', 'advisor'],
+        position: origin,
+      }),
+    ).toThrow(ModelError);
+  });
+
+  it('attaches an entity as a further subclass', () => {
+    const document = addSpecializationSub(withIsa(), 'isa', 'advisor');
+    expect(document.model.specializations[0]?.subIds).toEqual(['student', 'teacher', 'advisor']);
+  });
+
+  it("refuses to attach the node's own superclass or an existing subclass", () => {
+    expect(() => addSpecializationSub(withIsa(), 'isa', 'person')).toThrow(ModelError);
+    expect(() => addSpecializationSub(withIsa(), 'isa', 'student')).toThrow(ModelError);
+  });
+
+  it('refuses to attach an entity that is a subclass elsewhere', () => {
+    const chained = addSpecialization(withIsa(), {
+      id: 'isa2',
+      superId: 'student',
+      subIds: ['advisor', 'assistant'],
+      position: origin,
+    });
+    expect(() => addSpecializationSub(chained, 'isa', 'advisor')).toThrow(ModelError);
+  });
+
+  it('refuses an attach that would close a cycle', () => {
+    const chained = addSpecialization(withIsa(), {
+      id: 'isa2',
+      superId: 'student',
+      subIds: ['advisor', 'assistant'],
+      position: origin,
+    });
+    // PERSON already sits above STUDENT, so it cannot join below it.
+    expect(() => addSpecializationSub(chained, 'isa2', 'person')).toThrow(ModelError);
+  });
+
+  it('refuses an attach for a weak entity, an unknown node or an unknown entity', () => {
+    const weak = setEntityKind(zoo(), 'advisor', 'weak');
+    expect(() => addSpecializationSub(weak, 'isa', 'advisor')).toThrow(ModelError);
+    expect(() => addSpecializationSub(withIsa(), 'ghost', 'advisor')).toThrow(ModelError);
+    expect(() => addSpecializationSub(withIsa(), 'isa', 'ghost')).toThrow(ModelError);
+  });
+
+  it('detaches a subclass while the node still splits in two', () => {
+    const three = addSpecializationSub(withIsa(), 'isa', 'advisor');
+    const document = removeSpecializationSub(three, 'isa', 'advisor');
+    expect(document.model.specializations[0]?.subIds).toEqual(['student', 'teacher']);
+  });
+
+  it('refuses to detach below two subclasses', () => {
+    expect(() => removeSpecializationSub(withIsa(), 'isa', 'student')).toThrow(ModelError);
+  });
+
+  it('refuses to detach something that is not a subclass', () => {
+    expect(() => removeSpecializationSub(withIsa(), 'isa', 'advisor')).toThrow(ModelError);
+  });
+
+  it('changes coverage and overlap as one undoable field set', () => {
+    let document = setSpecializationCoverage(withIsa(), 'isa', 'total');
+    document = setSpecializationOverlap(document, 'isa', 'non-disjoint');
+    expect(document.model.specializations[0]).toMatchObject({
+      coverage: 'total',
+      overlap: 'non-disjoint',
+    });
+    expect(() => setSpecializationCoverage(withIsa(), 'ghost', 'total')).toThrow(ModelError);
+    expect(() => setSpecializationOverlap(withIsa(), 'ghost', 'disjoint')).toThrow(ModelError);
+  });
+
+  it('refuses to weaken an entity that takes part in a specialization', () => {
+    expect(() => setEntityKind(withIsa(), 'person', 'weak')).toThrow(ModelError);
+    expect(() => setEntityKind(withIsa(), 'student', 'weak')).toThrow(ModelError);
+    // Once the node is gone, the same entities weaken freely.
+    const freed = deleteElements(withIsa(), ['isa']);
+    expect(
+      setEntityKind(freed, 'student', 'weak').model.entities.some((e) => e.kind === 'weak'),
+    ).toBe(true);
+  });
+
+  it('deletes the whole node when a subclass or the superclass goes', () => {
+    let document = addSpecializationSub(withIsa(), 'isa', 'advisor');
+    document = addAttribute(document, {
+      id: 'staff',
+      ownerId: 'teacher',
+      name: 'staff_id',
+      offset: origin,
+    });
+
+    const subGone = deleteElements(document, ['student']);
+    expect(subGone.model.specializations).toEqual([]);
+    expect(subGone.model.entities.map((e) => e.id)).toEqual([
+      'person',
+      'teacher',
+      'advisor',
+      'assistant',
+    ]);
+    expect(subGone.model.attributes.map((a) => a.id)).toEqual(['staff']);
+
+    const superGone = deleteElements(document, ['person']);
+    expect(superGone.model.specializations).toEqual([]);
+
+    const nodeGone = deleteElements(document, ['isa']);
+    expect(nodeGone.model.specializations).toEqual([]);
+    expect(nodeGone.model.entities).toHaveLength(5);
+    expect(nodeGone.layout.positions['isa']).toBeUndefined();
+  });
+
+  it("prunes a deleted node's colour override", () => {
+    const coloured = setElementColor(withIsa(), 'isa', '#2563eb');
+    const document = deleteElements(coloured, ['isa']);
+    expect(document.presentation.colors['isa']).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
 import { messages } from '../i18n/messages.en';
 import { createColumnSpec, isIntegerType, takesLength, takesPrecision } from '../model/column';
-import { attributesOf, findEntity } from '../model/queries';
+import { attributesOf, findEntity, isaConstraintText, specializationOfSub } from '../model/queries';
 import type {
   Attribute,
   ColumnSpec,
@@ -19,6 +19,10 @@ import type { Column, RelationalSchema, Table } from './types';
  * - every entity becomes a table; its key attributes form the primary key,
  *   composites are flattened into their parts, and derived attributes are left
  *   out because they are computed rather than stored;
+ * - an entity below an ISA takes its superclass's key as a primary-key
+ *   foreign key (the Identity strategy of lesson 13) and its rows are deleted
+ *   with the superclass's; total and disjoint constraints belong to the
+ *   application, which MySQL cannot check;
  * - a weak entity also takes its owners' keys, through its identifying
  *   relationship, and its rows are deleted with its owner's;
  * - a multivalued attribute becomes a table of its own;
@@ -103,6 +107,15 @@ class SchemaBuilder {
     }
     for (const entity of this.model.entities) {
       this.resolveKey(entity);
+    }
+    for (const spec of this.model.specializations) {
+      // What the tables cannot say for themselves, the script must.
+      this.notes.push(
+        text.isaConstraints(
+          this.tableOf(spec.superId).name,
+          isaConstraintText(spec.coverage, spec.overlap),
+        ),
+      );
     }
     for (const relationship of this.model.relationships) {
       this.addRelationship(relationship);
@@ -238,6 +251,54 @@ class SchemaBuilder {
     return columns;
   }
 
+  /**
+   * The subclass's columns that carry the superclass key, in preference
+   * order: a foreign key the student marked to the superclass already rides
+   * the ISA; so does a single key attribute spelled with the superclass
+   * key's name, which is the lesson's `person_id (PK, FK)`; otherwise the
+   * key arrives as fresh columns, always primary, always cascading.
+   */
+  private inheritedKeyColumns(table: Table, parentId: Id): Column[] {
+    const parentTable = this.tableOf(parentId);
+    const reused = this.reuseHandForeignKey(table, parentId, true);
+    if (reused !== null) {
+      return reused;
+    }
+
+    const [keyName] = parentTable.primaryKey;
+    if (keyName !== undefined && parentTable.primaryKey.length === 1) {
+      const named = table.columns.find(
+        (column) =>
+          column.name.toLowerCase() === keyName.toLowerCase() &&
+          table.primaryKey.includes(column.name),
+      );
+      if (named !== undefined) {
+        const referenced = parentTable.columns.find((column) => column.name === keyName);
+        if (referenced && !sameType(named.spec, referenced.spec)) {
+          this.notes.push(text.foreignKeyTypeMatched(qualified(table, named), parentTable.name));
+        }
+        if (referenced) {
+          named.spec = { ...named.spec, ...typeOnly(referenced.spec) };
+        }
+        named.notNull = true;
+        this.claimed.add(named);
+        table.foreignKeys.push({
+          columns: [named.name],
+          table: parentTable.name,
+          referencedColumns: [keyName],
+          onDeleteCascade: true,
+        });
+        return [named];
+      }
+    }
+
+    return this.addForeignKey(table, parentTable, {
+      prefix: null,
+      notNull: true,
+      onDeleteCascade: true,
+    });
+  }
+
   private tableOf(entityId: Id): Table {
     const table = this.entityTables.get(entityId);
     if (!table) {
@@ -316,6 +377,21 @@ class SchemaBuilder {
       }
     }
 
+    // An entity below an ISA inherits the superclass key as its own primary
+    // key — the Identity strategy of lesson 13 — so the superclass settles
+    // first and the chain is followed up as far as it goes.
+    const parent = specializationOfSub(this.model, entity.id)?.superId;
+    if (parent !== undefined) {
+      const parentEntity = findEntity(this.model, parent);
+      if (this.keying.has(parent) || parentEntity === undefined) {
+        // A cycle cannot survive import; refuse the recursion all the same.
+        this.notes.push(text.ownerCycle(table.name, this.tableOf(parent).name));
+      } else {
+        this.resolveKey(parentEntity);
+        leading.push(...this.inheritedKeyColumns(table, parent));
+      }
+    }
+
     if (leading.length === 0 && table.primaryKey.length === 0) {
       leading.push(
         this.addColumn(table, text.generatedKey, {
@@ -328,7 +404,11 @@ class SchemaBuilder {
       this.notes.push(text.generatedPrimaryKey(table.name));
     }
 
-    const leadingNames = leading.map((column) => column.name);
+    const leadingNames = leading
+      .map((column) => column.name)
+      // A student who spelled the inherited key out as a key attribute of the
+      // same name already has it in the primary key; do not list it twice.
+      .filter((name) => !table.primaryKey.includes(name));
     table.primaryKey = [...leadingNames, ...table.primaryKey];
     table.columns = [...leading, ...table.columns.filter((column) => !leading.includes(column))];
 

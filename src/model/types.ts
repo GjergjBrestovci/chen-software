@@ -21,7 +21,7 @@ export type EntityKind = 'regular' | 'weak';
 export type RelationshipKind = 'regular' | 'identifying';
 
 /** Discriminator for "what sort of thing is this id?" lookups. */
-export type ElementKind = 'entity' | 'relationship' | 'attribute';
+export type ElementKind = 'entity' | 'relationship' | 'attribute' | 'specialization';
 
 /** MySQL column types a student can choose for an attribute (SQL export only). */
 export type SqlType =
@@ -118,11 +118,34 @@ export interface Relationship {
   ends: RelationshipEnd[];
 }
 
+/** How a specialization restricts its subclasses taken together. */
+export type SpecializationOverlap = 'disjoint' | 'non-disjoint';
+
+/**
+ * The ISA triangle: one superclass split into two or more subclasses that
+ * share its identity (data modelling lesson 'IS-A Relationships & Min-Max').
+ * The two constraints are independent, so every combination — (t,d), (t,nd),
+ * (p,d), (p,nd) — is expressible. They live on the node, not on the links,
+ * because they describe the split as a whole.
+ */
+export interface Specialization {
+  id: Id;
+  /** The entity the subclasses share. One superclass is split at most once. */
+  superId: Id;
+  /** At least two, unique. Each subclass belongs to exactly one specialization. */
+  subIds: Id[];
+  /** `total`: every superclass instance is in at least one subclass. */
+  coverage: Participation;
+  /** `disjoint`: no instance belongs to two of these subclasses at once. */
+  overlap: SpecializationOverlap;
+}
+
 /** The semantic model. Correctness depends on this alone, never on layout or colour. */
 export interface ErModel {
   entities: Entity[];
   attributes: Attribute[];
   relationships: Relationship[];
+  specializations: Specialization[];
 }
 
 export interface Position {
@@ -146,6 +169,7 @@ export interface ComponentTheme {
   entity: Color | null;
   relationship: Color | null;
   attribute: Color | null;
+  specialization: Color | null;
 }
 
 /**
@@ -160,7 +184,7 @@ export interface Presentation {
 }
 
 export interface ErDocument {
-  version: 3;
+  version: 4;
   title: string;
   model: ErModel;
   layout: Layout;

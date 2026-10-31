@@ -5,6 +5,144 @@ import { column, columnNames, Diagram, table } from './diagram';
 
 const text = messages.sql;
 
+describe('specializations', () => {
+  it('gives each subclass the superclass key as its primary key and a foreign key', () => {
+    const schema = mapModel(
+      new Diagram()
+        .entity('PERSON')
+        .key('person_id', 'PERSON')
+        .attribute('name', 'PERSON')
+        .entity('STUDENT')
+        .attribute('class_nr', 'STUDENT')
+        .entity('TEACHER')
+        .attribute('subject', 'TEACHER')
+        .isa('PERSON', ['STUDENT', 'TEACHER']).model,
+    );
+
+    const student = table(schema, 'STUDENT');
+    expect(columnNames(student)).toEqual(['person_id', 'class_nr']);
+    expect(student.primaryKey).toEqual(['person_id']);
+    expect(column(student, 'person_id')).toMatchObject({ notNull: true });
+    expect(student.foreignKeys).toHaveLength(1);
+    expect(student.foreignKeys[0]).toMatchObject({
+      columns: ['person_id'],
+      table: 'PERSON',
+      referencedColumns: ['person_id'],
+      onDeleteCascade: true,
+    });
+    expect(table(schema, 'PERSON').columns.length).toBe(2);
+    expect(table(schema, 'PERSON').primaryKey).toEqual(['person_id']);
+  });
+
+  it('keeps a subclass own key in a composite primary key after the inherited one', () => {
+    const schema = mapModel(
+      new Diagram()
+        .entity('PERSON')
+        .key('person_id', 'PERSON')
+        .entity('STUDENT')
+        .key('student_no', 'STUDENT')
+        .entity('TEACHER')
+        .key('emp_no', 'TEACHER')
+        .isa('PERSON', ['STUDENT', 'TEACHER']).model,
+    );
+
+    const student = table(schema, 'STUDENT');
+    expect(columnNames(student)).toEqual(['person_id', 'student_no']);
+    expect(student.primaryKey).toEqual(['person_id', 'student_no']);
+  });
+
+  it('reuses a marked foreign key instead of adding a second person column', () => {
+    const schema = mapModel(
+      new Diagram()
+        .entity('PERSON')
+        .key('person_id', 'PERSON')
+        .entity('STUDENT')
+        .attribute('sp_id', 'STUDENT', {
+          name: 'person_id',
+          identifier: 'key',
+          column: { type: 'INT' },
+        })
+        .attribute('class_nr', 'STUDENT')
+        .entity('TEACHER')
+        .key('emp_no', 'TEACHER')
+        .attribute('person_ref', 'TEACHER', {
+          foreignKey: true,
+          column: { type: 'INT', references: 'PERSON' },
+        })
+        .isa('PERSON', ['STUDENT', 'TEACHER']).model,
+    );
+
+    // STUDENT spells the inherited key as a key attribute named person_id:
+    // it stays the primary key, and the ISA adds no duplicate column.
+    const student = table(schema, 'STUDENT');
+    expect(student.primaryKey).toEqual(['person_id']);
+    expect(columnNames(student)).toEqual(['person_id', 'class_nr']);
+    expect(student.foreignKeys).toHaveLength(1);
+    expect(student.foreignKeys[0]).toMatchObject({ columns: ['person_id'], table: 'PERSON' });
+
+    // TEACHER already marked person_ref as the foreign key to PERSON: the
+    // ISA rides on that column, it does not mint a second one.
+    const teacher = table(schema, 'TEACHER');
+    expect(teacher.foreignKeys).toHaveLength(1);
+    expect(teacher.foreignKeys[0]).toMatchObject({ columns: ['person_ref'], table: 'PERSON' });
+    // The inherited key leads the composite.
+    expect(teacher.primaryKey).toEqual(['person_ref', 'emp_no']);
+  });
+
+  it('follows a chain of specializations down to the leaves', () => {
+    const schema = mapModel(
+      new Diagram()
+        .entity('ANIMAL')
+        .key('animal_id', 'ANIMAL')
+        .entity('MAMMAL')
+        .entity('BIRD')
+        .entity('CARNIVORE')
+        .entity('HERBIVORE')
+        .isa('ANIMAL', ['MAMMAL', 'BIRD'], { coverage: 'total' })
+        .isa('MAMMAL', ['CARNIVORE', 'HERBIVORE']).model,
+    );
+
+    const mammal = table(schema, 'MAMMAL');
+    expect(mammal.primaryKey).toEqual(['animal_id']);
+    expect(mammal.foreignKeys[0]).toMatchObject({ table: 'ANIMAL', onDeleteCascade: true });
+
+    const carnivore = table(schema, 'CARNIVORE');
+    expect(carnivore.primaryKey).toEqual(['animal_id']);
+    expect(carnivore.foreignKeys[0]).toMatchObject({
+      table: 'MAMMAL',
+      referencedColumns: ['animal_id'],
+    });
+  });
+
+  it('inherits a generated superclass key like any other', () => {
+    const schema = mapModel(
+      new Diagram()
+        .entity('PERSON')
+        .entity('STUDENT')
+        .entity('TEACHER')
+        .isa('PERSON', ['STUDENT', 'TEACHER']).model,
+    );
+
+    expect(table(schema, 'PERSON').primaryKey).toEqual([text.generatedKey]);
+    const student = table(schema, 'STUDENT');
+    expect(student.primaryKey).toEqual([text.generatedKey]);
+    expect(column(student, text.generatedKey).spec.type).toBe('INT');
+  });
+
+  it('notes that MySQL cannot enforce the constraints', () => {
+    const schema = mapModel(
+      new Diagram()
+        .entity('PERSON')
+        .key('person_id', 'PERSON')
+        .entity('STUDENT')
+        .entity('TEACHER')
+        .isa('PERSON', ['STUDENT', 'TEACHER'], { coverage: 'total', overlap: 'disjoint' }).model,
+    );
+
+    expect(schema.notes).toEqual([text.isaConstraints('PERSON', '(t,d)')]);
+  });
+});
+
 describe('entities', () => {
   it('becomes a table with a column per attribute, in model order', () => {
     const schema = mapModel(

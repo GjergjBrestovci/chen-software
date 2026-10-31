@@ -16,6 +16,7 @@ import { containsPoint, shapeSizeFor } from '../geometry';
 import { messages } from '../i18n/messages.en';
 import { freeSpotFor } from '../layout/placement';
 import { GRID_SIZE } from '../layout/types';
+import { canAttachSub } from '../model/queries';
 import type { Id, Position } from '../model/types';
 import { useDocumentStore } from '../store/documentStore';
 import { useUiStore } from '../store/uiStore';
@@ -26,6 +27,7 @@ import { Toolbar } from '../ui/Toolbar';
 import { AttributeNode } from './nodes/AttributeNode';
 import { EntityNode } from './nodes/EntityNode';
 import { RelationshipNode } from './nodes/RelationshipNode';
+import { SpecializationNode } from './nodes/SpecializationNode';
 import { ChenEdge } from './edges/ChenEdge';
 import { decideConnect, decideConnectEnd } from './connections';
 import type { ConnectionDecision } from './connections';
@@ -39,6 +41,7 @@ const nodeTypes = {
   entity: EntityNode,
   relationship: RelationshipNode,
   attribute: AttributeNode,
+  specialization: SpecializationNode,
 };
 
 const edgeTypes = { chen: ChenEdge };
@@ -74,7 +77,11 @@ const NEW_NAME = '';
  * student (SPEC.md §1, product rule 1).
  */
 function canOwnAttribute(node: AppNode): boolean {
-  return node.type !== 'attribute' || node.data.isComposite;
+  return (
+    node.type === 'entity' ||
+    node.type === 'relationship' ||
+    (node.type === 'attribute' && node.data.isComposite)
+  );
 }
 
 export function Canvas(): ReactElement {
@@ -85,6 +92,7 @@ export function Canvas(): ReactElement {
   const addEntityAt = useDocumentStore((state) => state.addEntityAt);
   const addAttributeTo = useDocumentStore((state) => state.addAttributeTo);
   const addRelationshipBetween = useDocumentStore((state) => state.addRelationshipBetween);
+  const attachSpecializationSub = useDocumentStore((state) => state.attachSpecializationSub);
   const moveMany = useDocumentStore((state) => state.moveMany);
   const remove = useDocumentStore((state) => state.remove);
 
@@ -231,6 +239,10 @@ export function Canvas(): ReactElement {
   const onNodeDoubleClick = useCallback(
     (event: ReactMouseEvent, node: AppNode) => {
       event.stopPropagation();
+      if (node.type === 'specialization') {
+        // The triangle is drawn with the fixed word ISA; there is nothing to rename.
+        return;
+      }
       startRenaming(node.id);
     },
     [startRenaming],
@@ -244,6 +256,15 @@ export function Canvas(): ReactElement {
         case 'create':
           createRelationship(decision.source, decision.target);
           break;
+        case 'attach':
+          // The pure decision knows the shapes; only the model knows whether
+          // this entity is free to join. The UI guards before the operation.
+          if (canAttachSub(document.model, decision.specId, decision.entityId)) {
+            attachSpecializationSub(decision.specId, decision.entityId);
+          } else {
+            notify(messages.canvas.attachUnfit);
+          }
+          break;
         case 'reject':
           notify(
             decision.reason === 'self'
@@ -255,7 +276,7 @@ export function Canvas(): ReactElement {
           break;
       }
     },
-    [createRelationship, notify],
+    [attachSpecializationSub, createRelationship, document.model, notify],
   );
 
   const onConnect = useCallback(
@@ -273,14 +294,15 @@ export function Canvas(): ReactElement {
   );
 
   /**
-   * The entity under a screen point, tested against the boxes this scene
-   * already computed rather than by poking at the DOM.
+   * The entity or specialization under a screen point, tested against the
+   * boxes this scene already computed rather than by poking at the DOM.
+   * `decideConnectEnd` sorts out which of the two was found.
    */
   const entityAt = useCallback(
     (clientX: number, clientY: number): Id | undefined => {
       const point = screenToFlowPosition({ x: clientX, y: clientY });
       for (const node of scene.nodes) {
-        if (node.type !== 'entity') {
+        if (node.type !== 'entity' && node.type !== 'specialization') {
           continue;
         }
         const box = scene.boxes.get(node.id);
@@ -300,7 +322,8 @@ export function Canvas(): ReactElement {
    * SPEC.md §5 says dragging onto another *entity* creates a relationship, but
    * React Flow only completes a connection within `connectionRadius` of a
    * handle, which is a few pixels at the edge of the shape. Releasing over the
-   * middle of a table did nothing at all.
+   * middle of a table did nothing at all. The same sweep lets a drop onto a
+   * specialization triangle attach the entity instead.
    */
   const onConnectEnd = useCallback(
     (event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {

@@ -91,6 +91,9 @@ export const CARDINALITY_FONT_SIZE = 13;
 /** Font size of a role name on a self-relationship end (SPEC.md §6). */
 export const ROLE_FONT_SIZE = 11;
 
+/** Font size of the (t,d) constraint text floating above an ISA triangle. */
+export const ISA_FONT_SIZE = 11;
+
 const DEFAULT_ROLE_CLEARANCE = 10;
 
 export interface EndLabelOptions extends CardinalityLabelOptions {

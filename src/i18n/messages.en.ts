@@ -43,6 +43,20 @@ export const messages = {
       `The foreign key ${attribute} references an entity that is missing from the file, so nothing was loaded.`,
     attributeOwnerCycle: (attribute: string): string =>
       `The attribute ${attribute} is part of itself, which cannot be drawn, so nothing was loaded.`,
+    unknownSpecializationElement: (specialization: string): string =>
+      `The specialization under ${specialization} connects to an entity that is missing from the file, so nothing was loaded.`,
+    specializationDuplicateSub: (specialization: string): string =>
+      `The specialization under ${specialization} lists the same subclass twice, so nothing was loaded.`,
+    specializationSelfSub: (specialization: string): string =>
+      `The specialization under ${specialization} is also one of its own subclasses, so nothing was loaded.`,
+    specializationSubTwice: (entity: string): string =>
+      `The entity ${entity} is a subclass in two specializations, so nothing was loaded.`,
+    specializationSuperTwice: (entity: string): string =>
+      `The entity ${entity} is the superclass of two specializations, so nothing was loaded.`,
+    specializationCycle: (entity: string): string =>
+      `The specialization under ${entity} leads back to itself, which cannot be drawn, so nothing was loaded.`,
+    specializationWeak: (entity: string): string =>
+      `The entity ${entity} is weak, and a weak entity cannot take part in a specialization, so nothing was loaded.`,
     placedMissingPositions: (count: number): string =>
       count === 1
         ? 'One element had no saved position and was placed on the canvas for you.'
@@ -52,6 +66,8 @@ export const messages = {
   /** Fallback label for an element the student has not named yet. */
   element: {
     unnamed: 'an unnamed element',
+    /** The fixed word drawn inside an ISA triangle; specializations have no name. */
+    specialization: 'ISA',
   },
 
   canvas: {
@@ -67,6 +83,7 @@ export const messages = {
     attributeNeedsOwner:
       'Select one entity, relationship or composite attribute first, then press A.',
     attributeNotComposite: 'Only a composite attribute has parts. Make it composite first.',
+    attachUnfit: 'Only a plain entity that belongs to no specialization can join a triangle.',
   },
 
   pdf: {
@@ -103,6 +120,8 @@ export const messages = {
       `Two tables would be called ${wanted}, so one became ${name}.`,
     missingCardinality: (relationship: string, entity: string): string =>
       `${relationship} has no cardinality on the ${entity} end, so it was treated as many.`,
+    isaConstraints: (entity: string, constraints: string): string =>
+      `${entity} is split into subclasses ${constraints}, but MySQL cannot enforce those constraints on the subclass tables.`,
     derivedLeftOut: (attribute: string, table: string): string =>
       `${attribute} in ${table} is derived, so it has no column.`,
     generatedPrimaryKey: (entity: string): string =>
@@ -181,6 +200,18 @@ export const messages = {
     foreignKey: 'Foreign key',
     keysAreEntityOnly: 'Only an entity attribute can be a key.',
     compositeHasParts: 'Delete its parts before changing the shape.',
+    /** Choosing a superclass over the selected entities is the general move. */
+    generalization: 'Generalization',
+    specializationNotPossible: 'Only plain entities that belong to no specialization can be split.',
+    detachNeedsTwo: 'An ISA must keep at least two specializations.',
+    coverage: 'Coverage',
+    total: 'Total',
+    partial: 'Partial',
+    overlap: 'Overlap',
+    disjoint: 'Disjoint',
+    nonDisjoint: 'Non-disjoint',
+    /** The listed subclasses are this superclass's specializations. */
+    specializations: 'Specializations',
   },
 
   /** The column panel: details only the SQL export uses. */

@@ -8,8 +8,11 @@ export interface Size {
   height: number;
 }
 
-/** The three outlines Chen notation needs (SPEC.md §5). */
-export type ShapeKind = 'rect' | 'diamond' | 'ellipse';
+/**
+ * The outlines the app draws: the three Chen notation needs (SPEC.md §5),
+ * plus the apex-up triangle for an ISA node (data-modeling lessons 05 and 13).
+ */
+export type ShapeKind = 'rect' | 'diamond' | 'ellipse' | 'triangle';
 
 /**
  * A shape as the geometry layer sees it: an outline, a centre and a size.

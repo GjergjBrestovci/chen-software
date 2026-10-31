@@ -1,4 +1,15 @@
-import type { Attribute, ElementKind, Entity, ErModel, Id, Relationship } from './types';
+import { messages } from '../i18n/messages.en';
+import type {
+  Attribute,
+  ElementKind,
+  Entity,
+  ErModel,
+  Id,
+  Participation,
+  Relationship,
+  Specialization,
+  SpecializationOverlap,
+} from './types';
 
 export function findEntity(model: ErModel, id: Id): Entity | undefined {
   return model.entities.find((entity) => entity.id === id);
@@ -17,6 +28,7 @@ export function findElementKind(model: ErModel, id: Id): ElementKind | undefined
   if (findEntity(model, id)) return 'entity';
   if (findRelationship(model, id)) return 'relationship';
   if (findAttribute(model, id)) return 'attribute';
+  if (findSpecialization(model, id)) return 'specialization';
   return undefined;
 }
 
@@ -39,12 +51,21 @@ export function findElementRef(model: ErModel, id: Id): ElementRef | undefined {
   const attribute = findAttribute(model, id);
   if (attribute) return { kind: 'attribute', name: attribute.name };
 
+  // The triangle carries no name; it is drawn with the fixed word ISA.
+  if (findSpecialization(model, id)) {
+    return { kind: 'specialization', name: messages.element.specialization };
+  }
+
   return undefined;
 }
 
 /** Display name of any element, or `undefined` if the id is unknown. */
 export function findElementName(model: ErModel, id: Id): string | undefined {
-  return (findEntity(model, id) ?? findRelationship(model, id) ?? findAttribute(model, id))?.name;
+  const named = findEntity(model, id) ?? findRelationship(model, id) ?? findAttribute(model, id);
+  if (named !== undefined) {
+    return named.name;
+  }
+  return findSpecialization(model, id) ? messages.element.specialization : undefined;
 }
 
 /** Attributes hanging off one entity or relationship, in model order. */
@@ -100,11 +121,120 @@ export function relationshipsTouching(model: ErModel, entityId: Id): Relationshi
   );
 }
 
+/** Every specialization the entity appears in, as superclass or as subclass. */
+export function specializationsInvolving(model: ErModel, entityId: Id): Specialization[] {
+  return model.specializations.filter(
+    (spec) => spec.superId === entityId || spec.subIds.includes(entityId),
+  );
+}
+
+/** The specialization node with this id, if there is one. */
+export function findSpecialization(model: ErModel, id: Id): Specialization | undefined {
+  return model.specializations.find((spec) => spec.id === id);
+}
+
+/** The node that splits `superId` into subclasses, if it is split at all. */
+export function specializationOfSuper(model: ErModel, superId: Id): Specialization | undefined {
+  return model.specializations.find((spec) => spec.superId === superId);
+}
+
+/** The node `subId` is a subclass in, if it is a subclass at all. */
+export function specializationOfSub(model: ErModel, subId: Id): Specialization | undefined {
+  return model.specializations.find((spec) => spec.subIds.includes(subId));
+}
+
+/**
+ * How the course abbreviates the two constraints on the ISA triangle:
+ * (t,d), (t,nd), (p,d) or (p,nd). The letters are notation, not prose, so
+ * they stay outside `i18n/`.
+ */
+export function isaConstraintText(coverage: Participation, overlap: SpecializationOverlap): string {
+  const total = coverage === 'total' ? 't' : 'p';
+  const disjoint = overlap === 'disjoint' ? 'd' : 'nd';
+  return `(${total},${disjoint})`;
+}
+
+/**
+ * True when `addSpecialization` would accept these participants: an
+ * unsplit regular superclass, regular subclasses claimed by no node, and no
+ * cycle. Arity stays the caller's business; the operation checks it too.
+ */
+export function canSpecialize(model: ErModel, superId: Id, subIds: readonly Id[]): boolean {
+  const superEntity = findEntity(model, superId);
+  if (superEntity === undefined || superEntity.kind === 'weak') {
+    return false;
+  }
+  if (specializationOfSuper(model, superId) !== undefined) {
+    return false;
+  }
+  if (new Set(subIds).size !== subIds.length) {
+    return false;
+  }
+  for (const subId of subIds) {
+    const subEntity = findEntity(model, subId);
+    if (subEntity === undefined || subEntity.kind === 'weak') {
+      return false;
+    }
+    if (subId === superEntity.id) {
+      return false;
+    }
+    if (specializationOfSub(model, subId) !== undefined) {
+      return false;
+    }
+    if (isAncestorOf(model, subId, superId)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** True when `entityId` could join `specId` as a further subclass. */
+export function canAttachSub(model: ErModel, specId: Id, entityId: Id): boolean {
+  const spec = findSpecialization(model, specId);
+  if (spec === undefined) {
+    return false;
+  }
+  const entity = findEntity(model, entityId);
+  if (entity === undefined || entity.kind === 'weak') {
+    return false;
+  }
+  if (entityId === spec.superId || spec.subIds.includes(entityId)) {
+    return false;
+  }
+  if (specializationOfSub(model, entityId) !== undefined) {
+    return false;
+  }
+  return !isAncestorOf(model, entityId, spec.superId);
+}
+
+/**
+ * True when `ancestorId` sits above `descendantId` in an ISA chain. A cyclic
+ * model cannot come from a valid file; as in `rootOwnerOf`, the walk then
+ * answers `false` rather than looping forever.
+ */
+export function isAncestorOf(model: ErModel, ancestorId: Id, descendantId: Id): boolean {
+  const seen = new Set<Id>([descendantId]);
+  let current = descendantId;
+
+  for (;;) {
+    const parent = specializationOfSub(model, current)?.superId;
+    if (parent === undefined || seen.has(parent)) {
+      return false;
+    }
+    if (parent === ancestorId) {
+      return true;
+    }
+    seen.add(parent);
+    current = parent;
+  }
+}
+
 /** Ids of every element in the model. Used for integrity checks and pruning. */
 export function allElementIds(model: ErModel): Id[] {
   return [
     ...model.entities.map((entity) => entity.id),
     ...model.relationships.map((relationship) => relationship.id),
+    ...model.specializations.map((spec) => spec.id),
     ...model.attributes.map((attribute) => attribute.id),
   ];
 }

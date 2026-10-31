@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "title": "University",
   "model": {
     "entities": [
@@ -414,7 +414,8 @@
           }
         ]
       }
-    ]
+    ],
+    "specializations": []
   },
   "layout": {
     "positions": {
@@ -520,7 +521,8 @@
     "theme": {
       "entity": null,
       "relationship": null,
-      "attribute": null
+      "attribute": null,
+      "specialization": null
     },
     "colors": {
       "ent_student": "#2563eb",

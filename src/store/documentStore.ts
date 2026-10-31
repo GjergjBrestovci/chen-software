@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import { attributeOffsetFor } from '../layout/placement';
+import { attributeOffsetFor, specializationPositionFor } from '../layout/placement';
 import { nextCardinality } from '../model/cardinality';
 import { createId } from '../model/ids';
 import * as operations from '../model/operations';
-import { findElementName, findRelationship } from '../model/queries';
+import { findElementKind, findElementName, findRelationship } from '../model/queries';
 import type {
   AttributeIdentifier,
   AttributeShape,
@@ -15,8 +15,10 @@ import type {
   EntityKind,
   ErDocument,
   Id,
+  Participation,
   Position,
   RelationshipKind,
+  SpecializationOverlap,
 } from '../model/types';
 
 /**
@@ -36,6 +38,11 @@ export interface DocumentStore {
   addEntityAt: (position: Position) => Id;
   addAttributeTo: (ownerId: Id) => Id;
   addRelationshipBetween: (entityIds: readonly Id[], position: Position) => Id;
+  addSpecializationFrom: (superId: Id, subIds: readonly Id[]) => Id;
+  attachSpecializationSub: (specId: Id, entityId: Id) => void;
+  detachSpecializationSub: (specId: Id, subId: Id) => void;
+  setSpecializationCoverage: (ids: Id | readonly Id[], coverage: Participation) => void;
+  setSpecializationOverlap: (ids: Id | readonly Id[], overlap: SpecializationOverlap) => void;
   rename: (id: Id, name: string) => void;
   setCardinality: (relationshipId: Id, endIndex: number, value: Cardinality | null) => void;
   cycleCardinality: (relationshipId: Id, endIndex: number) => void;
@@ -102,8 +109,51 @@ export const useDocumentStore = create<DocumentStore>()(
         return id;
       },
 
+      addSpecializationFrom: (superId, subIds) => {
+        const id = createId();
+        const document = get().document;
+        set({
+          document: operations.addSpecialization(document, {
+            id,
+            superId,
+            subIds,
+            position: specializationPositionFor(document, superId, subIds),
+          }),
+        });
+        return id;
+      },
+
+      attachSpecializationSub: (specId, entityId) => {
+        set({ document: operations.addSpecializationSub(get().document, specId, entityId) });
+      },
+
+      detachSpecializationSub: (specId, subId) => {
+        set({ document: operations.removeSpecializationSub(get().document, specId, subId) });
+      },
+
+      setSpecializationCoverage: (ids, coverage) => {
+        set({
+          document: forEachId(get().document, ids, (document, id) =>
+            operations.setSpecializationCoverage(document, id, coverage),
+          ),
+        });
+      },
+
+      setSpecializationOverlap: (ids, overlap) => {
+        set({
+          document: forEachId(get().document, ids, (document, id) =>
+            operations.setSpecializationOverlap(document, id, overlap),
+          ),
+        });
+      },
+
       rename: (id, name) => {
         const document = get().document;
+        // The triangle is drawn with the fixed word ISA; there is nothing to
+        // commit, and the double-click guard means no student sees this path.
+        if (findElementKind(document.model, id) === 'specialization') {
+          return;
+        }
         const current = findElementName(document.model, id);
         // Confirming a rename without changing anything must not fill the undo
         // history. An unknown id means the element was undone away while its

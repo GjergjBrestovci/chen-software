@@ -1,8 +1,10 @@
 import { shapeSizeFor } from '../geometry';
 import type { Size } from '../geometry';
+import { messages } from '../i18n/messages.en';
 import { ModelError } from '../model/errors';
 import { attributesOf, findElementRef } from '../model/queries';
 import type { ErDocument, Id, Position } from '../model/types';
+import { absoluteBoxes } from './boxes';
 import { shapeKindFor } from './types';
 
 /**
@@ -154,9 +156,9 @@ function isPositioned(document: ErDocument, id: Id, missing: ReadonlySet<Id>): b
  * whole file being rejected or the element being dropped, which would mean the
  * app editing the student's model (SPEC.md §1, product rule 1).
  *
- * Entities and relationships go in a row below whatever is already positioned,
- * so they never land on top of existing work. Attributes then use the ordinary
- * free-spot search around their owner.
+ * Entities, relationships and triangles go in a row below whatever is
+ * already positioned, so they never land on top of existing work. Attributes
+ * then use the ordinary free-spot search around their owner.
  */
 export function placeMissingPositions(document: ErDocument, missingIds: readonly Id[]): ErDocument {
   const missing = new Set(missingIds);
@@ -167,9 +169,8 @@ export function placeMissingPositions(document: ErDocument, missingIds: readonly
   const positions = { ...document.layout.positions };
   const { model } = document;
 
-  const placed = [...model.entities, ...model.relationships].filter((element) =>
-    isPositioned(document, element.id, missing),
-  );
+  const blockElements = [...model.entities, ...model.relationships, ...model.specializations];
+  const placed = blockElements.filter((element) => isPositioned(document, element.id, missing));
   const bottom = placed.reduce(
     (lowest, element) => Math.max(lowest, positions[element.id]?.y ?? 0),
     0,
@@ -180,7 +181,7 @@ export function placeMissingPositions(document: ErDocument, missingIds: readonly
   );
 
   let index = 0;
-  for (const element of [...model.entities, ...model.relationships]) {
+  for (const element of blockElements) {
     if (!missing.has(element.id)) {
       continue;
     }
@@ -204,6 +205,49 @@ export function placeMissingPositions(document: ErDocument, missingIds: readonly
   return repaired;
 }
 
+/**
+ * Where a new ISA triangle goes: centred between the superclass and the
+ * centroid of its subclasses, then nudged to the nearest clear spot. The
+ * course draws the superclass above and the subclasses below, so that
+ * midpoint sits in the gap between the two rows.
+ */
+export function specializationPositionFor(
+  document: ErDocument,
+  superId: Id,
+  subIds: readonly Id[],
+): Position {
+  if (subIds.length === 0) {
+    throw new ModelError('A specialization needs subclasses to sit between.');
+  }
+
+  const boxes = absoluteBoxes(document);
+  const superBox = boxes.get(superId);
+  if (superBox === undefined) {
+    throw new ModelError(`Unknown element "${superId}".`);
+  }
+  const subBoxes = subIds.map((id) => {
+    const box = boxes.get(id);
+    if (box === undefined) {
+      throw new ModelError(`Unknown element "${id}".`);
+    }
+    return box;
+  });
+
+  const centroid = subBoxes.reduce(
+    (sum, box) => ({
+      x: sum.x + box.center.x / subBoxes.length,
+      y: sum.y + box.center.y / subBoxes.length,
+    }),
+    { x: 0, y: 0 },
+  );
+  const size = shapeSizeFor('triangle', messages.element.specialization);
+  const desired = {
+    x: (superBox.center.x + centroid.x) / 2 - size.width / 2,
+    y: (superBox.center.y + centroid.y) / 2 - size.height / 2,
+  };
+  return freeSpotFor(document, desired, size);
+}
+
 /** Clear space kept around a new entity. */
 const NEW_ELEMENT_GAP = 24;
 /** Spots tried per row before moving down a row. */
@@ -217,8 +261,9 @@ const NEW_ELEMENT_ROWS = 8;
  *
  * Without this, pressing E twice put the second entity exactly on top of the
  * first, so the diagram looked unchanged and the entity underneath could not
- * be clicked. Only entities and relationships are considered occupied;
- * attributes sit around their owner and may be passed over.
+ * be clicked. Entities, relationships and specialization triangles are
+ * considered occupied; attributes sit around their owner and may be passed
+ * over.
  */
 export function freeSpotFor(document: ErDocument, desired: Position, size: Size): Position {
   const { model, layout } = document;
@@ -228,6 +273,10 @@ export function freeSpotFor(document: ErDocument, desired: Position, size: Size)
     ...model.relationships.map((relationship) => ({
       id: relationship.id,
       size: shapeSizeFor('diamond', relationship.name),
+    })),
+    ...model.specializations.map((spec) => ({
+      id: spec.id,
+      size: shapeSizeFor('triangle', messages.element.specialization),
     })),
   ].flatMap(({ id, size: occupiedSize }) => {
     const topLeft = layout.positions[id];

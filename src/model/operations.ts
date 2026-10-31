@@ -11,8 +11,13 @@ import {
   findElementKind,
   findEntity,
   findRelationship,
+  findSpecialization,
+  isAncestorOf,
   isDescendantOf,
   relationshipsTouching,
+  specializationOfSub,
+  specializationOfSuper,
+  specializationsInvolving,
 } from './queries';
 import type {
   AttributeIdentifier,
@@ -21,13 +26,16 @@ import type {
   Cardinality,
   Color,
   ComponentTheme,
+  Entity,
   EntityKind,
   ErDocument,
+  ErModel,
   Id,
   Participation,
   Position,
   Relationship,
   RelationshipKind,
+  SpecializationOverlap,
 } from './types';
 
 /**
@@ -48,9 +56,9 @@ export const MIN_RELATIONSHIP_ENDS = 2;
 
 export function createEmptyDocument(title: string = messages.document.untitled): ErDocument {
   return {
-    version: 3,
+    version: 4,
     title,
-    model: { entities: [], attributes: [], relationships: [] },
+    model: { entities: [], attributes: [], relationships: [], specializations: [] },
     layout: { positions: {} },
     presentation: createPresentation(),
     dismissedHints: [],
@@ -145,6 +153,9 @@ export function addAttribute(document: ErDocument, params: AddAttributeParams): 
   if (ownerKind === undefined) {
     throw new ModelError(`Unknown attribute owner "${params.ownerId}".`);
   }
+  if (ownerKind === 'specialization') {
+    throw new ModelError('A specialization cannot own attributes.');
+  }
 
   if (ownerKind === 'attribute') {
     const owner = findAttribute(document.model, params.ownerId);
@@ -186,6 +197,10 @@ export function renameElement(document: ErDocument, params: RenameElementParams)
   if (kind === undefined) {
     throw new ModelError(`Unknown element "${params.id}".`);
   }
+  if (kind === 'specialization') {
+    // The triangle is drawn with the fixed word ISA; there is no name to set.
+    throw new ModelError('A specialization has no name.');
+  }
 
   return produce(document, (draft) => {
     const target =
@@ -203,6 +218,10 @@ export function renameElement(document: ErDocument, params: RenameElementParams)
 export function setEntityKind(document: ErDocument, id: Id, kind: EntityKind): ErDocument {
   if (!findEntity(document.model, id)) {
     throw new ModelError(`Unknown entity "${id}".`);
+  }
+  if (kind === 'weak' && specializationsInvolving(document.model, id).length > 0) {
+    // The export could not tell a weak subtype's key from its superclass's.
+    throw new ModelError('A weak entity cannot take part in a specialization.');
   }
 
   return produce(document, (draft) => {
@@ -431,6 +450,167 @@ export function removeRelationshipEnd(
   });
 }
 
+/** Subclasses fewer than this and a split is no longer a split. */
+export const MIN_SPECIALIZATION_SUBS = 2;
+
+export interface AddSpecializationParams {
+  id: Id;
+  superId: Id;
+  /** Subclasses, two or more, no repeats. */
+  subIds: readonly Id[];
+  coverage?: Participation;
+  overlap?: SpecializationOverlap;
+  position: Position;
+}
+
+/** An entity that may sit in an ISA at all: present, and not weak. */
+function requireIsaEntity(model: ErModel, id: Id, role: string): Entity {
+  const entity = findEntity(model, id);
+  if (entity === undefined) {
+    throw new ModelError(`Unknown ${role} "${id}".`);
+  }
+  if (entity.kind === 'weak') {
+    throw new ModelError('A weak entity cannot take part in a specialization.');
+  }
+  return entity;
+}
+
+/**
+ * Splits one superclass into two or more subclasses. The structural rules
+ * (arity, no repeats, one split per superclass, one node per subclass, no
+ * cycles, weak out) guard the same invariant the file format enforces, so
+ * no operation can produce a document the importer would reject.
+ */
+export function addSpecialization(
+  document: ErDocument,
+  params: AddSpecializationParams,
+): ErDocument {
+  assertIdIsFree(document, params.id);
+
+  if (params.subIds.length < MIN_SPECIALIZATION_SUBS) {
+    throw new ModelError('A specialization must split into at least two subclasses.');
+  }
+  if (new Set(params.subIds).size !== params.subIds.length) {
+    throw new ModelError('A specialization must not list the same subclass twice.');
+  }
+
+  const { model } = document;
+  requireIsaEntity(model, params.superId, 'superclass');
+  if (specializationOfSuper(model, params.superId) !== undefined) {
+    throw new ModelError(`"${params.superId}" is already split by a specialization.`);
+  }
+
+  for (const subId of params.subIds) {
+    requireIsaEntity(model, subId, 'subclass');
+    if (subId === params.superId) {
+      throw new ModelError('A superclass cannot also be one of its own subclasses.');
+    }
+    if (specializationOfSub(model, subId) !== undefined) {
+      throw new ModelError(`"${subId}" is already a subclass of a specialization.`);
+    }
+    // The subclass will sit below the superclass, so a superclass that
+    // already descends from the subclass would close a cycle.
+    if (isAncestorOf(model, subId, params.superId)) {
+      throw new ModelError('The superclass is a descendant of one of its subclasses.');
+    }
+  }
+
+  return produce(document, (draft) => {
+    draft.model.specializations.push({
+      id: params.id,
+      superId: params.superId,
+      subIds: [...params.subIds],
+      coverage: params.coverage ?? 'partial',
+      overlap: params.overlap ?? 'disjoint',
+    });
+    draft.layout.positions[params.id] = { ...params.position };
+  });
+}
+
+/** Attaches an existing entity as a further subclass of a live node. */
+export function addSpecializationSub(document: ErDocument, specId: Id, entityId: Id): ErDocument {
+  const spec = findSpecialization(document.model, specId);
+  if (spec === undefined) {
+    throw new ModelError(`Unknown specialization "${specId}".`);
+  }
+  requireIsaEntity(document.model, entityId, 'entity');
+  if (entityId === spec.superId) {
+    throw new ModelError('A specialization cannot list its own superclass as a subclass.');
+  }
+  if (spec.subIds.includes(entityId)) {
+    throw new ModelError(`"${entityId}" is already a subclass of "${specId}".`);
+  }
+  if (specializationOfSub(document.model, entityId) !== undefined) {
+    throw new ModelError(`"${entityId}" is already a subclass of another specialization.`);
+  }
+  if (isAncestorOf(document.model, entityId, spec.superId)) {
+    throw new ModelError(
+      'The entity is already above the superclass, so this would close a cycle.',
+    );
+  }
+
+  return produce(document, (draft) => {
+    findSpecialization(draft.model, specId)?.subIds.push(entityId);
+  });
+}
+
+/** Detaches a subclass; the node must keep its minimum split. */
+export function removeSpecializationSub(document: ErDocument, specId: Id, subId: Id): ErDocument {
+  const spec = findSpecialization(document.model, specId);
+  if (spec === undefined) {
+    throw new ModelError(`Unknown specialization "${specId}".`);
+  }
+  if (!spec.subIds.includes(subId)) {
+    throw new ModelError(`"${subId}" is not a subclass of "${specId}".`);
+  }
+  if (spec.subIds.length <= MIN_SPECIALIZATION_SUBS) {
+    throw new ModelError('A specialization must keep at least two subclasses.');
+  }
+
+  return produce(document, (draft) => {
+    const target = findSpecialization(draft.model, specId);
+    if (target) {
+      target.subIds = target.subIds.filter((id) => id !== subId);
+    }
+  });
+}
+
+/** The fixed (t,p) half of the ISA label. */
+export function setSpecializationCoverage(
+  document: ErDocument,
+  id: Id,
+  coverage: Participation,
+): ErDocument {
+  if (findSpecialization(document.model, id) === undefined) {
+    throw new ModelError(`Unknown specialization "${id}".`);
+  }
+
+  return produce(document, (draft) => {
+    const spec = findSpecialization(draft.model, id);
+    if (spec) {
+      spec.coverage = coverage;
+    }
+  });
+}
+
+/** The fixed (d,nd) half of the ISA label. */
+export function setSpecializationOverlap(
+  document: ErDocument,
+  id: Id,
+  overlap: SpecializationOverlap,
+): ErDocument {
+  if (findSpecialization(document.model, id) === undefined) {
+    throw new ModelError(`Unknown specialization "${id}".`);
+  }
+
+  return produce(document, (draft) => {
+    const spec = findSpecialization(draft.model, id);
+    if (spec) {
+      spec.overlap = overlap;
+    }
+  });
+}
+
 /** Sets a component's own colour, or `null` to fall back to the theme. */
 export function setElementColor(document: ErDocument, id: Id, color: Color | null): ErDocument {
   if (findElementKind(document.model, id) === undefined) {
@@ -494,7 +674,8 @@ export function setTitle(document: ErDocument, title: string): ErDocument {
  * Collects everything that must disappear along with `ids` (SPEC.md §4):
  * deleting an entity also removes its attributes, every relationship touching
  * it, and those relationships' attributes. Attributes take their parts with
- * them, recursively.
+ * them, recursively. A specialization whose superclass or any subclass is
+ * deleted disappears whole; the remaining entities go on as plain ones.
  */
 function collectCascade(document: ErDocument, ids: readonly Id[]): Set<Id> {
   const removed = new Set<Id>();
@@ -523,9 +704,17 @@ function collectCascade(document: ErDocument, ids: readonly Id[]): Set<Id> {
         for (const relationship of relationshipsTouching(document.model, id)) {
           removeWithAttributes(relationship.id);
         }
+        for (const spec of specializationsInvolving(document.model, id)) {
+          // One participant disappearing dissolves the split; the other
+          // subclasses survive as ordinary entities.
+          removed.add(spec.id);
+        }
         break;
       case 'relationship':
         removeWithAttributes(id);
+        break;
+      case 'specialization':
+        removed.add(id);
         break;
       case 'attribute':
         removeAttributeTree(id);
@@ -568,6 +757,9 @@ export function deleteElements(document: ErDocument, ids: readonly Id[]): ErDocu
     );
     draft.model.attributes = draft.model.attributes.filter(
       (attribute) => !removed.has(attribute.id),
+    );
+    draft.model.specializations = draft.model.specializations.filter(
+      (spec) => !removed.has(spec.id),
     );
 
     draft.layout.positions = Object.fromEntries(

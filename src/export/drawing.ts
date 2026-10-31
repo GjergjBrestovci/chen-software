@@ -1,6 +1,7 @@
 import {
   CARDINALITY_FONT_SIZE,
   DOUBLE_LINE_GAP,
+  ISA_FONT_SIZE,
   MARKER_SIZE,
   ROLE_FONT_SIZE,
   boundsOf,
@@ -17,9 +18,12 @@ import {
   textLineHeight,
   unionBounds,
 } from '../geometry';
-import type { Bounds, EdgeSegment, Point, ShapeBox } from '../geometry';
+import { arrowHeadAt } from '../geometry';
+import type { ArrowHead, Bounds, EdgeSegment, Point, ShapeBox } from '../geometry';
 import { absoluteBoxes } from '../layout/boxes';
+import { messages } from '../i18n/messages.en';
 import { colorFor } from '../model/presentation';
+import { isaConstraintText } from '../model/queries';
 import type { Attribute, Color, ElementKind, ErDocument, Id } from '../model/types';
 
 /**
@@ -53,7 +57,7 @@ export interface DrawnShape {
 }
 
 export interface DrawnLabel {
-  kind: 'cardinality' | 'role';
+  kind: 'cardinality' | 'role' | 'isa';
   text: string;
   /** Centre of the text. */
   position: Point;
@@ -64,14 +68,19 @@ export interface DrawnLabel {
 
 export interface Drawing {
   shapes: DrawnShape[];
-  /** Every line: attribute links, and relationship ends (a total end contributes two). */
+  /** Every line: attribute links, ISA links, and relationship ends (a total end contributes two). */
   lines: EdgeSegment[];
+  /** Filled arrowheads, one per ISA link that points at a superclass. */
+  arrows: ArrowHead[];
   labels: DrawnLabel[];
   /** Everything that gets ink, or `null` for an empty diagram. */
   bounds: Bounds | null;
 }
 
 export const CARDINALITY_PLACEHOLDER = '?';
+
+/** How far the constraint text floats above the triangle's apex. */
+const ISA_LABEL_CLEARANCE = 8;
 
 function underlineFor(attribute: Attribute | undefined): Underline {
   if (attribute?.identifier === 'key') return 'solid';
@@ -98,6 +107,17 @@ function textBounds(center: Point, text: string, fontSize: number): Bounds {
   };
 }
 
+/** The box a filled arrowhead covers. */
+function arrowBounds(arrow: ArrowHead): Bounds {
+  const points = [arrow.tip, arrow.left, arrow.right];
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  };
+}
+
 function markerBounds(shape: DrawnShape): Bounds[] {
   return markerSlots(shape.box, shape.markers.length).map((slot) => ({
     minX: shape.box.center.x + slot.x - MARKER_SIZE.width / 2,
@@ -112,6 +132,7 @@ export function describeDiagram(document: ErDocument): Drawing {
   const boxes = absoluteBoxes(document);
   const shapes: DrawnShape[] = [];
   const lines: EdgeSegment[] = [];
+  const arrows: ArrowHead[] = [];
   const labels: DrawnLabel[] = [];
 
   const shape = (
@@ -142,6 +163,43 @@ export function describeDiagram(document: ErDocument): Drawing {
   for (const entity of model.entities) {
     shape(entity.id, 'entity', entity.name, entity.kind === 'weak');
   }
+
+  for (const spec of model.specializations) {
+    shape(spec.id, 'specialization', messages.element.specialization, false);
+
+    const triangle = boxes.get(spec.id);
+    if (!triangle) {
+      continue;
+    }
+    const superBox = boxes.get(spec.superId);
+    if (superBox) {
+      const superLink = floatingEdge(superBox, triangle);
+      lines.push(superLink);
+      // The line starts on the superclass's outline; the arrow points back
+      // along it, tip touching the superclass.
+      arrows.push(arrowHeadAt(superLink.start, superLink.end));
+    }
+    for (const subId of spec.subIds) {
+      const subBox = boxes.get(subId);
+      if (subBox) {
+        lines.push(floatingEdge(triangle, subBox));
+      }
+    }
+
+    // The course's constraint text floats above the apex and is always drawn:
+    // an ISA node without (t,d) etc. is not a full statement of the split.
+    labels.push({
+      kind: 'isa',
+      text: isaConstraintText(spec.coverage, spec.overlap),
+      position: {
+        x: triangle.center.x,
+        y: triangle.center.y - triangle.size.height / 2 - ISA_LABEL_CLEARANCE,
+      },
+      fontSize: ISA_FONT_SIZE,
+      unset: false,
+    });
+  }
+
   for (const relationship of model.relationships) {
     shape(relationship.id, 'relationship', relationship.name, relationship.kind === 'identifying');
   }
@@ -206,8 +264,9 @@ export function describeDiagram(document: ErDocument): Drawing {
   const bounds = unionBounds([
     ...shapes.map((drawn) => boundsOf(drawn.box)),
     ...shapes.flatMap(markerBounds),
+    ...arrows.map(arrowBounds),
     ...labels.map((label) => textBounds(label.position, label.text, label.fontSize)),
   ]);
 
-  return { shapes, lines, labels, bounds };
+  return { shapes, lines, arrows, labels, bounds };
 }
