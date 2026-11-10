@@ -290,6 +290,27 @@ body {
   font-weight: 400;
 }
 
+/* Typing a (min,max) pair: the same size and spot as the chip it replaces. */
+.chen-min-max-field {
+  background: var(--chen-paper);
+  border: 1px solid var(--chen-accent);
+  border-radius: 4px;
+  color: var(--chen-ink);
+  font-family: var(--chen-font);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  pointer-events: all;
+  position: absolute;
+  text-align: center;
+}
+
+.chen-min-max-field--invalid {
+  border-color: var(--chen-danger);
+  outline: 1px solid var(--chen-danger);
+}
+
 /* ---------- toolbar ---------- */
 
 .chen-toolbar {

@@ -15,6 +15,7 @@ import type { ArrowHead, EdgeSegment, Point, ShapeBox, Size } from '../geometry'
 import { ANCHOR_HANDLE_ID } from './nodes/AnchorHandle';
 import { messages } from '../i18n/messages.en';
 import { colorFor } from '../model/presentation';
+import { formatMinMax } from '../model/minMax';
 import { isaConstraintText } from '../model/queries';
 import type {
   Attribute,
@@ -22,6 +23,8 @@ import type {
   Color,
   ErDocument,
   Id,
+  MinMax,
+  Notation,
   Position,
   Relationship,
 } from '../model/types';
@@ -94,7 +97,10 @@ export type AppNode =
 export type CardinalityLabel = {
   relationshipId: Id;
   endIndex: number;
+  /** Which of the two values below the chip shows and edits. */
+  notation: Notation;
   value: Cardinality | null;
+  minMax: MinMax | null;
   position: Point;
 };
 
@@ -365,7 +371,11 @@ export function buildScene(input: SceneInput): Scene {
       if (!entity) {
         return;
       }
-      const placement = cardinalityLabelPlacement(entity, diamond);
+      const placement = cardinalityLabelPlacement(
+        entity,
+        diamond,
+        document.notation === 'min-max' ? { text: formatMinMax(end.minMax) } : {},
+      );
 
       edges.push({
         id: cardinalityEdgeId(relationship.id, index),
@@ -381,7 +391,9 @@ export function buildScene(input: SceneInput): Scene {
           label: {
             relationshipId: relationship.id,
             endIndex: index,
+            notation: document.notation,
             value: end.cardinality,
+            minMax: end.minMax,
             position: placement.position,
           },
           arrow: null,

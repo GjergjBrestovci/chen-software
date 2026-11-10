@@ -12,6 +12,8 @@ import {
   deleteElements,
   setAttributeForeignKey,
   setElementColor,
+  setMinMax,
+  setNotation,
 } from '../../model/operations';
 import type { Specialization } from '../../model/types';
 import { createColumnSpec } from '../../model/column';
@@ -111,6 +113,34 @@ describe('describeDiagram on the university fixture', () => {
   });
 });
 
+describe('describeDiagram in the min-max notation', () => {
+  function minMaxUniversity(): ErDocument {
+    let document = setNotation(university(), 'min-max');
+    const first = document.model.relationships[0];
+    if (!first) throw new Error('expected a relationship');
+    document = setMinMax(document, {
+      relationshipId: first.id,
+      endIndex: 0,
+      minMax: { min: 17, max: 36 },
+    });
+    return document;
+  }
+
+  it('writes each end as a pair, and an undecided one as (?,?)', () => {
+    const labels = describeDiagram(minMaxUniversity()).labels.filter(
+      (label) => label.kind === 'cardinality',
+    );
+    expect(labels).toHaveLength(9);
+    expect(labels[0]).toMatchObject({ text: '(17,36)', unset: false });
+    expect(labels.slice(1).every((label) => label.text === '(?,?)' && label.unset)).toBe(true);
+  });
+
+  it('draws every end with a single line, since min says whether it is mandatory', () => {
+    // 15 attribute lines and one line per end, with no doubled total ends.
+    expect(describeDiagram(minMaxUniversity()).lines).toHaveLength(15 + 9);
+  });
+});
+
 describe('describeDiagram edge cases', () => {
   it('describes an empty diagram as nothing, with no bounds', () => {
     expect(describeDiagram(createEmptyDocument())).toEqual({
@@ -184,8 +214,20 @@ describe('describeDiagram edge cases', () => {
             name: 'r',
             kind: 'regular',
             ends: [
-              { entityId: 'a', cardinality: '1', participation: 'partial', role: null },
-              { entityId: 'ghost', cardinality: 'N', participation: 'partial', role: null },
+              {
+                entityId: 'a',
+                cardinality: '1',
+                participation: 'partial',
+                minMax: null,
+                role: null,
+              },
+              {
+                entityId: 'ghost',
+                cardinality: 'N',
+                participation: 'partial',
+                minMax: null,
+                role: null,
+              },
             ],
           },
         ],
@@ -279,9 +321,9 @@ describe('describeDiagram with a specialization', () => {
   it('writes all four constraint combinations', () => {
     const cases = [
       [{ coverage: 'total' as const, overlap: 'disjoint' as const }, '(t,d)'],
-      [{ coverage: 'total' as const, overlap: 'non-disjoint' as const }, '(t,nd)'],
+      [{ coverage: 'total' as const, overlap: 'overlapping' as const }, '(t,o)'],
       [{ coverage: 'partial' as const, overlap: 'disjoint' as const }, '(p,d)'],
-      [{ coverage: 'partial' as const, overlap: 'non-disjoint' as const }, '(p,nd)'],
+      [{ coverage: 'partial' as const, overlap: 'overlapping' as const }, '(p,o)'],
     ] as const;
     for (const [flags, text] of cases) {
       const drawing = describeDiagram(zoo(flags));

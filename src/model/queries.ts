@@ -145,12 +145,12 @@ export function specializationOfSub(model: ErModel, subId: Id): Specialization |
 
 /**
  * How the course abbreviates the two constraints on the ISA triangle:
- * (t,d), (t,nd), (p,d) or (p,nd). The letters are notation, not prose, so
+ * (t,d), (t,o), (p,d) or (p,o). The letters are notation, not prose, so
  * they stay outside `i18n/`.
  */
 export function isaConstraintText(coverage: Participation, overlap: SpecializationOverlap): string {
   const total = coverage === 'total' ? 't' : 'p';
-  const disjoint = overlap === 'disjoint' ? 'd' : 'nd';
+  const disjoint = overlap === 'disjoint' ? 'd' : 'o';
   return `(${total},${disjoint})`;
 }
 

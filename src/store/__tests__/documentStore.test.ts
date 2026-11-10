@@ -48,14 +48,27 @@ describe('documentStore', () => {
     expect(store().document.model.entities).toEqual(before);
   });
 
+  it('switches the notation as one undoable step, and ignores a switch to the same one', () => {
+    const before = useDocumentStore.temporal.getState().pastStates.length;
+    store().setNotation('classic');
+    expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before);
+
+    store().setNotation('min-max');
+    expect(store().document.notation).toBe('min-max');
+    expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before + 1);
+
+    useDocumentStore.temporal.getState().undo();
+    expect(store().document.notation).toBe('classic');
+  });
+
   it('creates a relationship with both cardinalities undecided', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });
     const id = store().addRelationshipBetween([a, b], { x: 200, y: 0 });
 
     expect(findRelationship(store().document.model, id)?.ends).toEqual([
-      { entityId: a, cardinality: null, participation: 'partial', role: null },
-      { entityId: b, cardinality: null, participation: 'partial', role: null },
+      { entityId: a, cardinality: null, participation: 'partial', minMax: null, role: null },
+      { entityId: b, cardinality: null, participation: 'partial', minMax: null, role: null },
     ]);
   });
 
@@ -371,9 +384,9 @@ describe('specialization actions', () => {
     const isa = store().addSpecializationFrom(person, [student, teacher]);
 
     store().setSpecializationCoverage(isa, 'total');
-    store().setSpecializationOverlap([isa], 'non-disjoint');
+    store().setSpecializationOverlap([isa], 'overlapping');
     const spec = findSpecialization(store().document.model, isa);
-    expect(spec).toMatchObject({ coverage: 'total', overlap: 'non-disjoint' });
+    expect(spec).toMatchObject({ coverage: 'total', overlap: 'overlapping' });
   });
 
   it('ignores renames aimed at a specialization instead of throwing', () => {

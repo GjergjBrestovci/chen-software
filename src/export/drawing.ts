@@ -23,6 +23,7 @@ import type { ArrowHead, Bounds, EdgeSegment, Point, ShapeBox } from '../geometr
 import { absoluteBoxes } from '../layout/boxes';
 import { messages } from '../i18n/messages.en';
 import { colorFor } from '../model/presentation';
+import { formatMinMax } from '../model/minMax';
 import { isaConstraintText } from '../model/queries';
 import type { Attribute, Color, ElementKind, ErDocument, Id } from '../model/types';
 
@@ -62,7 +63,7 @@ export interface DrawnLabel {
   /** Centre of the text. */
   position: Point;
   fontSize: number;
-  /** A cardinality the student has not chosen yet, drawn as `?`. */
+  /** A cardinality or pair the student has not chosen yet, drawn as `?` or `(?,?)`. */
   unset: boolean;
 }
 
@@ -213,6 +214,7 @@ export function describeDiagram(document: ErDocument): Drawing {
     }
   }
 
+  const minMax = document.notation === 'min-max';
   for (const relationship of model.relationships) {
     // absoluteBoxes places every relationship unconditionally; only attributes
     // can be left out. SPEC.md §10 allows an assertion with this explanation.
@@ -232,22 +234,26 @@ export function describeDiagram(document: ErDocument): Drawing {
       const sharing = relationship.ends.filter((other) => other.entityId === end.entityId).length;
       const offset = spreadOffset(index, sharing);
 
-      if (end.participation === 'total') {
+      // A (min,max) pair already says whether taking part is mandatory, so
+      // the min-max notation never doubles a line.
+      if (!minMax && end.participation === 'total') {
         lines.push(...parallelEdges(entity, diamond, DOUBLE_LINE_GAP, offset));
       } else {
         lines.push(offsetEdge(entity, diamond, offset));
       }
 
+      const text = minMax ? formatMinMax(end.minMax) : (end.cardinality ?? CARDINALITY_PLACEHOLDER);
       const placement = endLabelPlacement(offsetEdge(entity, diamond, offset), {
         side: sideForOffset(offset),
         role: end.role,
+        ...(minMax ? { text } : {}),
       });
       labels.push({
         kind: 'cardinality',
-        text: end.cardinality ?? CARDINALITY_PLACEHOLDER,
+        text,
         position: placement.position,
         fontSize: CARDINALITY_FONT_SIZE,
-        unset: end.cardinality === null,
+        unset: minMax ? end.minMax === null : end.cardinality === null,
       });
       if (end.role !== null && placement.rolePosition) {
         labels.push({

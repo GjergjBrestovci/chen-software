@@ -7,6 +7,7 @@ import {
   setAttributeColumn,
   setCardinality,
   setEndRole,
+  setMinMax,
   setParticipation,
 } from '../../model/operations';
 import type {
@@ -18,6 +19,7 @@ import type {
   ErDocument,
   ErModel,
   Id,
+  MinMax,
   Participation,
   RelationshipKind,
   SpecializationOverlap,
@@ -42,6 +44,7 @@ export interface AttributeOptions {
 export interface EndOptions {
   cardinality?: Cardinality | null;
   participation?: Participation;
+  minMax?: MinMax | null;
   role?: string;
 }
 
@@ -97,6 +100,13 @@ export class Diagram {
           relationshipId: id,
           endIndex,
           participation: options.participation,
+        });
+      }
+      if (options.minMax !== undefined) {
+        this.document = setMinMax(this.document, {
+          relationshipId: id,
+          endIndex,
+          minMax: options.minMax,
         });
       }
       if (options.role !== undefined) {

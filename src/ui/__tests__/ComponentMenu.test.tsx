@@ -563,10 +563,10 @@ describe('specialization menu', () => {
     );
 
     await user.click(screen.getByRole('menuitemradio', { name: 'Total' }));
-    await user.click(screen.getByRole('menuitemradio', { name: 'Non-disjoint' }));
+    await user.click(screen.getByRole('menuitemradio', { name: 'Overlapping' }));
 
     const spec = findSpecialization(store().document.model, specId);
-    expect(spec).toMatchObject({ coverage: 'total', overlap: 'non-disjoint' });
+    expect(spec).toMatchObject({ coverage: 'total', overlap: 'overlapping' });
   });
 
   it('lists the subclasses and detaches one once the node has three', async () => {

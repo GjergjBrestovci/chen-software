@@ -15,6 +15,8 @@ import type {
   EntityKind,
   ErDocument,
   Id,
+  MinMax,
+  Notation,
   Participation,
   Position,
   RelationshipKind,
@@ -46,6 +48,8 @@ export interface DocumentStore {
   rename: (id: Id, name: string) => void;
   setCardinality: (relationshipId: Id, endIndex: number, value: Cardinality | null) => void;
   cycleCardinality: (relationshipId: Id, endIndex: number) => void;
+  setMinMax: (relationshipId: Id, endIndex: number, value: MinMax | null) => void;
+  setNotation: (notation: Notation) => void;
   // These take one id or several. Several is still one undo entry, and it is
   // all or nothing: one id the model refuses leaves every one unchanged.
   setEntityKind: (ids: Id | readonly Id[], kind: EntityKind) => void;
@@ -187,6 +191,32 @@ export const useDocumentStore = create<DocumentStore>()(
             cardinality: nextCardinality(end.cardinality),
           }),
         });
+      },
+
+      setMinMax: (relationshipId, endIndex, value) => {
+        const document = get().document;
+        const current = findRelationship(document.model, relationshipId)?.ends[endIndex]?.minMax;
+        // Confirming the pair already there must not fill the undo history.
+        if (
+          current !== undefined &&
+          (current === value ||
+            (current !== null &&
+              value !== null &&
+              current.min === value.min &&
+              current.max === value.max))
+        ) {
+          return;
+        }
+        set({
+          document: operations.setMinMax(document, { relationshipId, endIndex, minMax: value }),
+        });
+      },
+
+      setNotation: (notation) => {
+        if (get().document.notation === notation) {
+          return;
+        }
+        set({ document: operations.setNotation(get().document, notation) });
       },
 
       setEntityKind: (ids, kind) => {

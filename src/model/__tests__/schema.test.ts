@@ -62,7 +62,7 @@ describe('parseErDocument', () => {
   });
 
   it('exposes the current version', () => {
-    expect(CURRENT_VERSION).toBe(4);
+    expect(CURRENT_VERSION).toBe(5);
   });
 });
 
@@ -111,6 +111,33 @@ describe('parseErDocument rejects malformed files', () => {
     );
   });
 
+  it('accepts a (min,max) pair with no upper limit', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        at(at(document.model.relationships, 0).ends, 0).minMax = { min: 0, max: 'n' };
+      }),
+    );
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('rejects a (min,max) pair whose max is below its min', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        at(at(document.model.relationships, 0).ends, 0).minMax = { min: 3, max: 1 };
+      }),
+    );
+    expect(outcome.ok).toBe(false);
+  });
+
+  it('rejects an unknown notation', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        (document as { notation: string }).notation = 'crow';
+      }),
+    );
+    expect(outcome.ok).toBe(false);
+  });
+
   it('accepts a ternary relationship', () => {
     const outcome = parseErDocument(
       corrupted((document) => {
@@ -119,6 +146,7 @@ describe('parseErDocument rejects malformed files', () => {
           entityId: at(document.model.entities, 2).id,
           cardinality: '1',
           participation: 'partial',
+          minMax: null,
           role: null,
         });
       }),
@@ -398,7 +426,7 @@ describe('parseErDocument checks specializations', () => {
 
   it('accepts every combination of coverage and overlap', () => {
     for (const coverage of ['partial', 'total'] as const) {
-      for (const overlap of ['disjoint', 'non-disjoint'] as const) {
+      for (const overlap of ['disjoint', 'overlapping'] as const) {
         const outcome = parseErDocument(withSpecializations(specialization({ coverage, overlap })));
         expect(outcome.ok).toBe(true);
       }

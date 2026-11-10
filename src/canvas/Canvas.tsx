@@ -89,6 +89,7 @@ export function Canvas(): ReactElement {
   const { screenToFlowPosition, getViewport, setViewport } = useReactFlow();
 
   const document = useDocumentStore((state) => state.document);
+  const setNotation = useDocumentStore((state) => state.setNotation);
   const addEntityAt = useDocumentStore((state) => state.addEntityAt);
   const addAttributeTo = useDocumentStore((state) => state.addAttributeTo);
   const addRelationshipBetween = useDocumentStore((state) => state.addRelationshipBetween);
@@ -487,6 +488,10 @@ export function Canvas(): ReactElement {
             onToggleRelationshipMode={toggleRelationshipMode}
             onDeleteSelection={deleteSelection}
             onToggleSnap={toggleSnapToGrid}
+            onToggleMinMax={() => {
+              setNotation(document.notation === 'min-max' ? 'classic' : 'min-max');
+            }}
+            minMaxNotation={document.notation === 'min-max'}
             onToggleTheme={toggleTheme}
             theme={theme}
             onUndo={undo}

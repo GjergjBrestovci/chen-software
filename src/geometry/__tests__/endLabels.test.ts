@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { floatingEdge, offsetEdge, spreadOffsets } from '../edges';
 import {
+  CARDINALITY_FONT_SIZE,
   cardinalityLabelPlacement,
   endLabelPlacement,
   ROLE_FONT_SIZE,
@@ -132,6 +133,32 @@ describe('endLabelPlacement', () => {
   it('keeps a missing role missing even when the shapes overlap', () => {
     const segment = floatingEdge(entityAt(0, 0), diamondAt(0, 0));
     expect(endLabelPlacement(segment).rolePosition).toBeNull();
+  });
+});
+
+describe('endLabelPlacement with the label text', () => {
+  it('pushes a wide (min,max) pair clear of a vertical line', () => {
+    const segment = floatingEdge(entityAt(0, 0), diamondAt(0, 300));
+    const text = '(17,36)';
+    const placement = endLabelPlacement(segment, { text });
+    const halfWidth = measureTextWidth(text, CARDINALITY_FONT_SIZE) / 2;
+    expect(Math.abs(sideOf(segment, placement.position))).toBeGreaterThan(halfWidth);
+  });
+
+  it('leaves a single letter where it was without the text', () => {
+    const segment = floatingEdge(entityAt(0, 0), diamondAt(400, 0));
+    expect(endLabelPlacement(segment, { text: 'N' }).position).toEqual(
+      endLabelPlacement(segment).position,
+    );
+  });
+
+  it('keeps a role name outside a wide pair', () => {
+    const segment = floatingEdge(entityAt(0, 0), diamondAt(0, 300));
+    const placement = endLabelPlacement(segment, { text: '(17,36)', role: 'boss' });
+    if (!placement.rolePosition) throw new Error('expected a role position');
+    expect(Math.abs(sideOf(segment, placement.rolePosition))).toBeGreaterThan(
+      Math.abs(sideOf(segment, placement.position)),
+    );
   });
 });
 

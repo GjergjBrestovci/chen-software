@@ -19,7 +19,14 @@ function seedRelationship(): string {
 }
 
 function labelFor(relationshipId: string, value: Cardinality | null): CardinalityLabel {
-  return { relationshipId, endIndex: 0, value, position: { x: 10, y: 20 } };
+  return {
+    relationshipId,
+    endIndex: 0,
+    notation: 'classic',
+    value,
+    minMax: null,
+    position: { x: 10, y: 20 },
+  };
 }
 
 function endValue(relationshipId: string): Cardinality | null {
@@ -94,5 +101,95 @@ describe('CardinalityChip', () => {
 
     expect(screen.getByRole('button').style.transform).toContain('10px, 20px');
     expect(store().document.model).toEqual(snapshot);
+  });
+});
+
+describe('CardinalityChip in the min-max notation', () => {
+  beforeEach(() => {
+    setIdGenerator(sequentialIdGenerator('c'));
+    useDocumentStore.setState({ document: createEmptyDocument() });
+    useDocumentStore.temporal.getState().clear();
+    return () => {
+      resetIdGenerator();
+    };
+  });
+
+  function pairLabel(relationshipId: string): CardinalityLabel {
+    return {
+      relationshipId,
+      endIndex: 0,
+      notation: 'min-max',
+      value: null,
+      minMax: findRelationship(store().document.model, relationshipId)?.ends[0]?.minMax ?? null,
+      position: { x: 10, y: 20 },
+    };
+  }
+
+  const pairOf = (relationshipId: string): unknown =>
+    findRelationship(store().document.model, relationshipId)?.ends[0]?.minMax;
+
+  it('shows a dashed (?,?) placeholder while the pair is undecided', () => {
+    const id = seedRelationship();
+    render(<CardinalityChip label={pairLabel(id)} />);
+
+    const button = screen.getByRole('button', { name: /not set yet/i });
+    expect(button).toHaveTextContent('(?,?)');
+    expect(button.className).toContain('chen-cardinality--unset');
+  });
+
+  it('stores a typed pair on Enter, and only on the clicked end', async () => {
+    const user = userEvent.setup();
+    const id = seedRelationship();
+    render(<CardinalityChip label={pairLabel(id)} />);
+
+    await user.click(screen.getByRole('button'));
+    await user.type(screen.getByRole('textbox', { name: '(min,max) pair' }), '1,3{Enter}');
+
+    expect(pairOf(id)).toEqual({ min: 1, max: 3 });
+    expect(findRelationship(store().document.model, id)?.ends[1]?.minMax).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('keeps the field open and marked when the pair cannot be read', async () => {
+    const user = userEvent.setup();
+    const id = seedRelationship();
+    render(<CardinalityChip label={pairLabel(id)} />);
+
+    await user.click(screen.getByRole('button'));
+    const field = screen.getByRole('textbox');
+    await user.type(field, '3,1{Enter}');
+
+    expect(field).toHaveAttribute('aria-invalid', 'true');
+    expect(pairOf(id)).toBeNull();
+  });
+
+  it('throws the draft away on Escape', async () => {
+    const user = userEvent.setup();
+    const id = seedRelationship();
+    render(<CardinalityChip label={pairLabel(id)} />);
+
+    await user.click(screen.getByRole('button'));
+    await user.type(screen.getByRole('textbox'), '0,n{Escape}');
+
+    expect(pairOf(id)).toBeNull();
+    expect(screen.getByRole('button')).toHaveTextContent('(?,?)');
+  });
+
+  it('shows the stored pair and records one undo entry per change', async () => {
+    const user = userEvent.setup();
+    const id = seedRelationship();
+    const { rerender } = render(<CardinalityChip label={pairLabel(id)} />);
+    const before = useDocumentStore.temporal.getState().pastStates.length;
+
+    await user.click(screen.getByRole('button'));
+    await user.type(screen.getByRole('textbox'), '0,n{Enter}');
+    rerender(<CardinalityChip label={pairLabel(id)} />);
+
+    expect(screen.getByRole('button', { name: /\(0,n\)/ })).toHaveTextContent('(0,n)');
+    expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before + 1);
+
+    await user.click(screen.getByRole('button'));
+    await user.keyboard('{Enter}');
+    expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before + 1);
   });
 });

@@ -1,6 +1,7 @@
 {
-  "version": 4,
+  "version": 5,
   "title": "Bookstore",
+  "notation": "classic",
   "model": {
     "entities": [
       {
@@ -256,12 +257,14 @@
             "entityId": "ent_publisher",
             "cardinality": "1",
             "participation": "partial",
+            "minMax": null,
             "role": null
           },
           {
             "entityId": "ent_book",
             "cardinality": "N",
             "participation": "partial",
+            "minMax": null,
             "role": null
           }
         ]
@@ -275,12 +278,14 @@
             "entityId": "ent_author",
             "cardinality": "M",
             "participation": "partial",
+            "minMax": null,
             "role": null
           },
           {
             "entityId": "ent_book",
             "cardinality": "N",
             "participation": "partial",
+            "minMax": null,
             "role": null
           }
         ]
@@ -294,12 +299,14 @@
             "entityId": "ent_genre",
             "cardinality": "1",
             "participation": "partial",
+            "minMax": null,
             "role": null
           },
           {
             "entityId": "ent_book",
             "cardinality": "N",
             "participation": "partial",
+            "minMax": null,
             "role": null
           }
         ]

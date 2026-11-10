@@ -1,6 +1,7 @@
 {
-  "version": 4,
+  "version": 5,
   "title": "Zoo",
+  "notation": "classic",
   "model": {
     "entities": [
       {
