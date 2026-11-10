@@ -269,9 +269,9 @@ describe('specialization queries', () => {
 
   it('writes the course constraint text from the two flags', () => {
     expect(isaConstraintText('total', 'disjoint')).toBe('(t,d)');
-    expect(isaConstraintText('total', 'non-disjoint')).toBe('(t,nd)');
+    expect(isaConstraintText('total', 'overlapping')).toBe('(t,o)');
     expect(isaConstraintText('partial', 'disjoint')).toBe('(p,d)');
-    expect(isaConstraintText('partial', 'non-disjoint')).toBe('(p,nd)');
+    expect(isaConstraintText('partial', 'overlapping')).toBe('(p,o)');
   });
 });
 

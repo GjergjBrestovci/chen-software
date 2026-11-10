@@ -6,6 +6,7 @@ import {
   CURRENT_VERSION,
   erDocumentSchema,
   erModelV3Schema,
+  erModelV4Schema,
   parseErDocument,
   presentationV3Schema,
   versionOf,
@@ -60,10 +61,21 @@ const erDocumentV1Schema = z.strictObject({
 type ErDocumentV1 = z.infer<typeof erDocumentV1Schema>;
 
 /**
+ * Version 4: everything version 5 has except the diagram's `notation` and the
+ * ends' `minMax`, and with `non-disjoint` where version 5 says `overlapping`.
+ */
+const erDocumentV4Schema = erDocumentSchema.omit({ notation: true }).extend({
+  version: z.literal(4),
+  model: erModelV4Schema,
+});
+
+type ErDocumentV4 = z.infer<typeof erDocumentV4Schema>;
+
+/**
  * Version 2: everything version 4 has except the attributes' `column`, the
  * specializations and their theme colour.
  */
-const erDocumentV2Schema = erDocumentSchema.extend({
+const erDocumentV2Schema = erDocumentV4Schema.extend({
   version: z.literal(2),
   model: erModelV3Schema.extend({ attributes: z.array(attributeV2Schema) }),
   presentation: presentationV3Schema,
@@ -72,7 +84,7 @@ const erDocumentV2Schema = erDocumentSchema.extend({
 type ErDocumentV2 = z.infer<typeof erDocumentV2Schema>;
 
 /** Version 3: everything version 4 has except the specializations and their theme colour. */
-const erDocumentV3Schema = erDocumentSchema.extend({
+const erDocumentV3Schema = erDocumentV4Schema.extend({
   version: z.literal(3),
   model: erModelV3Schema,
   presentation: presentationV3Schema,
@@ -154,7 +166,7 @@ function migrateV2ToV3(document: ErDocumentV2): ErDocumentV3 {
  * means "not chosen", so an upgraded diagram looks and behaves exactly as it
  * did — the same rule every earlier upgrade followed.
  */
-function migrateV3ToV4(document: ErDocumentV3): ErDocument {
+function migrateV3ToV4(document: ErDocumentV3): ErDocumentV4 {
   return {
     ...document,
     version: 4,
@@ -162,6 +174,30 @@ function migrateV3ToV4(document: ErDocumentV3): ErDocument {
     presentation: {
       ...document.presentation,
       theme: { ...document.presentation.theme, specialization: null },
+    },
+  };
+}
+
+/**
+ * Version 4 to 5. Every end gets an undecided `(min,max)` pair and the diagram
+ * keeps the classic notation, so it looks exactly as it did. `non-disjoint`
+ * becomes `overlapping`, the course's word for the same constraint.
+ */
+function migrateV4ToV5(document: ErDocumentV4): ErDocument {
+  return {
+    ...document,
+    version: 5,
+    notation: 'classic',
+    model: {
+      ...document.model,
+      relationships: document.model.relationships.map((relationship) => ({
+        ...relationship,
+        ends: relationship.ends.map((end) => ({ ...end, minMax: null })),
+      })),
+      specializations: document.model.specializations.map((spec) => ({
+        ...spec,
+        overlap: spec.overlap === 'disjoint' ? 'disjoint' : 'overlapping',
+      })),
     },
   };
 }
@@ -182,7 +218,10 @@ export function migrateToCurrent(input: unknown): MigrationOutcome {
     if (!parsed.success) {
       return { ok: false, message: messages.file.invalid };
     }
-    return { ok: true, value: migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed.data))) };
+    return {
+      ok: true,
+      value: migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed.data)))),
+    };
   }
 
   if (version === 2) {
@@ -190,7 +229,7 @@ export function migrateToCurrent(input: unknown): MigrationOutcome {
     if (!parsed.success) {
       return { ok: false, message: messages.file.invalid };
     }
-    return { ok: true, value: migrateV3ToV4(migrateV2ToV3(parsed.data)) };
+    return { ok: true, value: migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(parsed.data))) };
   }
 
   if (version === 3) {
@@ -198,7 +237,15 @@ export function migrateToCurrent(input: unknown): MigrationOutcome {
     if (!parsed.success) {
       return { ok: false, message: messages.file.invalid };
     }
-    return { ok: true, value: migrateV3ToV4(parsed.data) };
+    return { ok: true, value: migrateV4ToV5(migrateV3ToV4(parsed.data)) };
+  }
+
+  if (version === 4) {
+    const parsed = erDocumentV4Schema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, message: messages.file.invalid };
+    }
+    return { ok: true, value: migrateV4ToV5(parsed.data) };
   }
 
   return { ok: false, message: messages.file.unsupportedVersion(version) };

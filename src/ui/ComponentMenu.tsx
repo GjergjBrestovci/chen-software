@@ -162,10 +162,10 @@ function SpecializationSection({
       </MenuGroup>
 
       <MenuGroup label={messages.menu.overlap}>
-        {(['disjoint', 'non-disjoint'] as const).map((overlap) => (
+        {(['disjoint', 'overlapping'] as const).map((overlap) => (
           <MenuItem
             key={overlap}
-            label={overlap === 'disjoint' ? messages.menu.disjoint : messages.menu.nonDisjoint}
+            label={overlap === 'disjoint' ? messages.menu.disjoint : messages.menu.overlapping}
             pressed={all(
               items.map((spec) => spec.overlap),
               overlap,

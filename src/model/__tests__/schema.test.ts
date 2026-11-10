@@ -62,7 +62,7 @@ describe('parseErDocument', () => {
   });
 
   it('exposes the current version', () => {
-    expect(CURRENT_VERSION).toBe(4);
+    expect(CURRENT_VERSION).toBe(5);
   });
 });
 
@@ -119,6 +119,7 @@ describe('parseErDocument rejects malformed files', () => {
           entityId: at(document.model.entities, 2).id,
           cardinality: '1',
           participation: 'partial',
+          minMax: null,
           role: null,
         });
       }),
@@ -398,7 +399,7 @@ describe('parseErDocument checks specializations', () => {
 
   it('accepts every combination of coverage and overlap', () => {
     for (const coverage of ['partial', 'total'] as const) {
-      for (const overlap of ['disjoint', 'non-disjoint'] as const) {
+      for (const overlap of ['disjoint', 'overlapping'] as const) {
         const outcome = parseErDocument(withSpecializations(specialization({ coverage, overlap })));
         expect(outcome.ok).toBe(true);
       }

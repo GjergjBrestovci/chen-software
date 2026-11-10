@@ -56,7 +56,8 @@ export const MIN_RELATIONSHIP_ENDS = 2;
 
 export function createEmptyDocument(title: string = messages.document.untitled): ErDocument {
   return {
-    version: 4,
+    version: 5,
+    notation: 'classic',
     title,
     model: { entities: [], attributes: [], relationships: [], specializations: [] },
     layout: { positions: {} },
@@ -128,6 +129,7 @@ export function addRelationship(document: ErDocument, params: AddRelationshipPar
         entityId,
         cardinality: null,
         participation: 'partial',
+        minMax: null,
         role: null,
       })),
     });
@@ -426,6 +428,7 @@ export function addRelationshipEnd(
       entityId,
       cardinality: null,
       participation: 'partial',
+      minMax: null,
       role: null,
     });
   });
@@ -593,7 +596,7 @@ export function setSpecializationCoverage(
   });
 }
 
-/** The fixed (d,nd) half of the ISA label. */
+/** The (d,o) half of the ISA label. */
 export function setSpecializationOverlap(
   document: ErDocument,
   id: Id,

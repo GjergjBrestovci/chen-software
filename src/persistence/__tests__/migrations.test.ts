@@ -134,9 +134,28 @@ describe('version 1 to 2', () => {
   });
 });
 
+/** The bookstore fixture as it is today, at the current version. */
+function current(): ErDocument {
+  return JSON.parse(fixture('bookstore.erd.json')) as ErDocument;
+}
+
+/** The bookstore fixture as version 4 wrote it: no notation, no `(min,max)` pairs. */
+function v4(): Record<string, unknown> {
+  const raw = JSON.parse(fixture('bookstore.erd.json')) as Record<string, unknown>;
+  delete raw['notation'];
+  const model = raw['model'] as Record<string, unknown>;
+  for (const relationship of model['relationships'] as { ends: Record<string, unknown>[] }[]) {
+    for (const end of relationship.ends) {
+      delete end['minMax'];
+    }
+  }
+  raw['version'] = 4;
+  return raw;
+}
+
 /** The bookstore fixture as version 2 wrote it: no `column`, no specializations. */
 function v2(): Record<string, unknown> {
-  const raw = JSON.parse(fixture('bookstore.erd.json')) as Record<string, unknown>;
+  const raw = v4();
   const model = raw['model'] as Record<string, unknown>;
   delete model['specializations'];
   model['attributes'] = (model['attributes'] as Record<string, unknown>[]).map((attribute) => {
@@ -159,7 +178,7 @@ describe('version 2 to 3', () => {
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
     const { document } = outcome.value;
-    expect(document.version).toBe(4);
+    expect(document.version).toBe(CURRENT_VERSION);
     expect(document.model.attributes).toHaveLength(11);
     expect(document.model.attributes.every((a) => a.column.type === null)).toBe(true);
     expect(document.model.attributes[0]?.column).toEqual(createColumnSpec());
@@ -171,7 +190,7 @@ describe('version 2 to 3', () => {
     if (!outcome.ok) throw new Error(outcome.message);
     const after = outcome.value.document;
     expect(after.model.entities).toEqual(before.model.entities);
-    expect(after.model.relationships).toEqual(before.model.relationships);
+    expect(after.model.relationships).toEqual(current().model.relationships);
     expect(after.layout).toEqual(before.layout);
     expect(after.presentation).toEqual({
       ...before.presentation,
@@ -188,16 +207,14 @@ describe('version 2 to 3', () => {
 
   it('rejects a version 2 file that already has column details, since v2 never wrote them', () => {
     const raw = v2();
-    (raw['model'] as Record<string, unknown>)['attributes'] = (
-      JSON.parse(fixture('bookstore.erd.json')) as ErDocument
-    ).model.attributes;
+    (raw['model'] as Record<string, unknown>)['attributes'] = current().model.attributes;
     expect(migrateToCurrent(raw).ok).toBe(false);
   });
 });
 
 /** The bookstore fixture as version 3 wrote it: no specializations, three theme colours. */
 function v3(): Record<string, unknown> {
-  const raw = JSON.parse(fixture('bookstore.erd.json')) as Record<string, unknown>;
+  const raw = v4();
   const model = raw['model'] as Record<string, unknown>;
   delete model['specializations'];
   const presentation = raw['presentation'] as Record<string, unknown>;
@@ -212,7 +229,7 @@ describe('version 3 to 4', () => {
     const outcome = readDocument(v3());
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) return;
-    expect(outcome.value.document.version).toBe(4);
+    expect(outcome.value.document.version).toBe(CURRENT_VERSION);
     expect(outcome.value.document.model.specializations).toEqual([]);
     expect(outcome.value.document.presentation.theme.specialization).toBeNull();
   });
@@ -224,7 +241,7 @@ describe('version 3 to 4', () => {
     const after = outcome.value.document;
     expect(after.model.entities).toEqual(before.model.entities);
     expect(after.model.attributes).toEqual(before.model.attributes);
-    expect(after.model.relationships).toEqual(before.model.relationships);
+    expect(after.model.relationships).toEqual(current().model.relationships);
     expect(after.layout).toEqual(before.layout);
     expect(after.presentation.colors).toEqual(before.presentation.colors);
     expect(after.title).toBe(before.title);
@@ -240,6 +257,62 @@ describe('version 3 to 4', () => {
   it('rejects a version 3 file that already has specializations, since v3 never wrote them', () => {
     const raw = v3();
     (raw['model'] as Record<string, unknown>)['specializations'] = [];
+    expect(migrateToCurrent(raw).ok).toBe(false);
+  });
+});
+
+describe('version 4 to 5', () => {
+  it('keeps the classic notation and leaves every pair undecided', () => {
+    const outcome = readDocument(v4());
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    const { document } = outcome.value;
+    expect(document.version).toBe(CURRENT_VERSION);
+    expect(document.notation).toBe('classic');
+    expect(
+      document.model.relationships.flatMap((relationship) => relationship.ends),
+    ).not.toHaveLength(0);
+    expect(
+      document.model.relationships.every((relationship) =>
+        relationship.ends.every((end) => end.minMax === null),
+      ),
+    ).toBe(true);
+  });
+
+  it('changes nothing else', () => {
+    const outcome = readDocument(v4());
+    if (!outcome.ok) throw new Error(outcome.message);
+    expect(outcome.value.document).toEqual(current());
+  });
+
+  it('renames non-disjoint to overlapping', () => {
+    const raw = JSON.parse(fixture('zoo.erd.json')) as Record<string, unknown>;
+    delete raw['notation'];
+    raw['version'] = 4;
+    const model = raw['model'] as { specializations: Record<string, unknown>[] };
+    for (const spec of model.specializations) {
+      spec['overlap'] = 'non-disjoint';
+    }
+    const outcome = readDocument(raw);
+    if (!outcome.ok) throw new Error(outcome.message);
+    expect(outcome.value.document.model.specializations.map((spec) => spec.overlap)).toEqual([
+      'overlapping',
+      'overlapping',
+    ]);
+  });
+
+  it('rejects a version 4 file that already says overlapping, since v4 never wrote it', () => {
+    const raw = JSON.parse(fixture('zoo.erd.json')) as Record<string, unknown>;
+    delete raw['notation'];
+    raw['version'] = 4;
+    const model = raw['model'] as { specializations: Record<string, unknown>[] };
+    model.specializations.forEach((spec) => (spec['overlap'] = 'overlapping'));
+    expect(migrateToCurrent(raw).ok).toBe(false);
+  });
+
+  it('rejects a version 4 file that already has a notation, since v4 never wrote one', () => {
+    const raw = v4();
+    raw['notation'] = 'min-max';
     expect(migrateToCurrent(raw).ok).toBe(false);
   });
 });

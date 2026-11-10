@@ -209,7 +209,7 @@ export const messages = {
     partial: 'Partial',
     overlap: 'Overlap',
     disjoint: 'Disjoint',
-    nonDisjoint: 'Non-disjoint',
+    overlapping: 'Overlapping',
     /** The listed subclasses are this superclass's specializations. */
     specializations: 'Specializations',
   },

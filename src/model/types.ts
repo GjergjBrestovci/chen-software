@@ -4,6 +4,28 @@ export type Id = string;
 /** Chen cardinality. `M` and `N` both mean "many"; the letter is a style choice. */
 export type Cardinality = '1' | 'N' | 'M';
 
+/**
+ * How the diagram writes relationship ends: classic `1`/`N`/`M` labels with
+ * double lines for total participation, or `(min,max)` pairs (data modelling
+ * lesson 'IS-A Relationships & Min-Max'). Both are stored on every end, so
+ * switching back and forth loses nothing.
+ */
+export type Notation = 'classic' | 'min-max';
+
+/** Upper bound of a `(min,max)` pair: a whole number, or `n` for "no limit". */
+export type MaxCount = number | 'n';
+
+/**
+ * A `(min,max)` pair. It counts the entity it stands next to, look-here
+ * style: `(1,3)` beside KEEPER means "one keeper takes part at least once and
+ * at most three times". `min` is at least 0; a numeric `max` is at least 1
+ * and at least `min`.
+ */
+export interface MinMax {
+  min: number;
+  max: MaxCount;
+}
+
 /** Whether every instance of an entity must take part in a relationship. */
 export type Participation = 'partial' | 'total';
 
@@ -106,6 +128,11 @@ export interface RelationshipEnd {
    */
   cardinality: Cardinality | null;
   participation: Participation;
+  /**
+   * The end's `(min,max)` pair, independent of `cardinality` and
+   * `participation`. `null` means the student has not decided yet.
+   */
+  minMax: MinMax | null;
   /** Shown on self-relationship ends; `null` elsewhere. */
   role: string | null;
 }
@@ -119,13 +146,13 @@ export interface Relationship {
 }
 
 /** How a specialization restricts its subclasses taken together. */
-export type SpecializationOverlap = 'disjoint' | 'non-disjoint';
+export type SpecializationOverlap = 'disjoint' | 'overlapping';
 
 /**
  * The ISA triangle: one superclass split into two or more subclasses that
  * share its identity (data modelling lesson 'IS-A Relationships & Min-Max').
- * The two constraints are independent, so every combination — (t,d), (t,nd),
- * (p,d), (p,nd) — is expressible. They live on the node, not on the links,
+ * The two constraints are independent, so every combination — (t,d), (t,o),
+ * (p,d), (p,o) — is expressible. They live on the node, not on the links,
  * because they describe the split as a whole.
  */
 export interface Specialization {
@@ -184,8 +211,10 @@ export interface Presentation {
 }
 
 export interface ErDocument {
-  version: 4;
+  version: 5;
   title: string;
+  /** Which labels the relationship ends show. Stored with the diagram. */
+  notation: Notation;
   model: ErModel;
   layout: Layout;
   presentation: Presentation;

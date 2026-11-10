@@ -30,13 +30,13 @@ const positionSchema = z.strictObject({
 
 const colorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, { error: 'expected a #rrggbb colour' });
 
+const positiveIntSchema = z.number().int().positive();
+
 const entitySchema = z.strictObject({
   id: idSchema,
   name: z.string(),
   kind: z.enum(['regular', 'weak']),
 });
-
-const positiveIntSchema = z.number().int().positive();
 
 const columnSchema = z.strictObject({
   type: z.enum(SQL_TYPES).nullable(),
@@ -63,26 +63,50 @@ export const attributeV2Schema = z.strictObject({
 
 const attributeSchema = attributeV2Schema.extend({ column: columnSchema });
 
-const relationshipEndSchema = z.strictObject({
+/** Relationship end as versions 2 to 4 wrote it. Version 5 adds `minMax`. */
+const relationshipEndV4Schema = z.strictObject({
   entityId: idSchema,
   cardinality: z.enum(['1', 'N', 'M']).nullable(),
   participation: z.enum(['partial', 'total']),
   role: z.string().nullable(),
 });
 
-const relationshipSchema = z.strictObject({
+/** A numeric `max` must be at least 1 and at least `min`; `(0,0)` says nothing. */
+const minMaxSchema = z
+  .strictObject({
+    min: z.number().int().nonnegative(),
+    max: z.union([positiveIntSchema, z.literal('n')]),
+  })
+  .refine((pair) => pair.max === 'n' || pair.max >= pair.min, {
+    error: 'max must not be below min',
+  });
+
+const relationshipEndSchema = relationshipEndV4Schema.extend({
+  minMax: minMaxSchema.nullable(),
+});
+
+const relationshipV4Schema = z.strictObject({
   id: idSchema,
   name: z.string(),
   kind: z.enum(['regular', 'identifying']),
+  ends: z.array(relationshipEndV4Schema).min(2),
+});
+
+const relationshipSchema = relationshipV4Schema.extend({
   ends: z.array(relationshipEndSchema).min(2),
 });
 
-const specializationSchema = z.strictObject({
+/** Specialization as version 4 wrote it: overlap was called `non-disjoint`. */
+const specializationV4Schema = z.strictObject({
   id: idSchema,
   superId: idSchema,
   subIds: z.array(idSchema).min(2),
   coverage: z.enum(['partial', 'total']),
   overlap: z.enum(['disjoint', 'non-disjoint']),
+});
+
+const specializationSchema = specializationV4Schema.extend({
+  overlap: z.enum(['disjoint', 'overlapping']),
 });
 
 export const erModelSchema = z.strictObject({
@@ -93,14 +117,25 @@ export const erModelSchema = z.strictObject({
 });
 
 /**
- * The model and presentation version 3 wrote: today's shapes without
- * `specializations` and its theme colour. `persistence/migrations.ts` validates
- * old files against these before upgrading them.
+ * The model version 4 wrote: ends without `minMax`, and `non-disjoint` where
+ * version 5 says `overlapping`. `persistence/migrations.ts` validates old files
+ * against these before upgrading them.
+ */
+export const erModelV4Schema = z.strictObject({
+  entities: z.array(entitySchema),
+  attributes: z.array(attributeSchema),
+  relationships: z.array(relationshipV4Schema),
+  specializations: z.array(specializationV4Schema),
+});
+
+/**
+ * The model and presentation version 3 wrote: version 4's shapes without
+ * `specializations` and its theme colour.
  */
 export const erModelV3Schema = z.strictObject({
   entities: z.array(entitySchema),
   attributes: z.array(attributeSchema),
-  relationships: z.array(relationshipSchema),
+  relationships: z.array(relationshipV4Schema),
 });
 
 export const presentationV3Schema = z.strictObject({
@@ -116,7 +151,7 @@ const layoutSchema = z.strictObject({
   positions: z.record(z.string(), positionSchema),
 });
 
-const presentationSchema = z.strictObject({
+export const presentationSchema = z.strictObject({
   theme: z.strictObject({
     entity: colorSchema.nullable(),
     relationship: colorSchema.nullable(),
@@ -127,8 +162,9 @@ const presentationSchema = z.strictObject({
 });
 
 export const erDocumentSchema = z.strictObject({
-  version: z.literal(4),
+  version: z.literal(5),
   title: z.string(),
+  notation: z.enum(['classic', 'min-max']),
   model: erModelSchema,
   layout: layoutSchema,
   presentation: presentationSchema,
@@ -136,7 +172,7 @@ export const erDocumentSchema = z.strictObject({
 });
 
 /** The format version this build writes, and reads without migration. */
-export const CURRENT_VERSION = 4;
+export const CURRENT_VERSION = 5;
 
 const versionProbeSchema = z.object({ version: z.number() });
 

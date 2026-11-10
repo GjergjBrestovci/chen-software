@@ -184,8 +184,20 @@ describe('describeDiagram edge cases', () => {
             name: 'r',
             kind: 'regular',
             ends: [
-              { entityId: 'a', cardinality: '1', participation: 'partial', role: null },
-              { entityId: 'ghost', cardinality: 'N', participation: 'partial', role: null },
+              {
+                entityId: 'a',
+                cardinality: '1',
+                participation: 'partial',
+                minMax: null,
+                role: null,
+              },
+              {
+                entityId: 'ghost',
+                cardinality: 'N',
+                participation: 'partial',
+                minMax: null,
+                role: null,
+              },
             ],
           },
         ],
@@ -279,9 +291,9 @@ describe('describeDiagram with a specialization', () => {
   it('writes all four constraint combinations', () => {
     const cases = [
       [{ coverage: 'total' as const, overlap: 'disjoint' as const }, '(t,d)'],
-      [{ coverage: 'total' as const, overlap: 'non-disjoint' as const }, '(t,nd)'],
+      [{ coverage: 'total' as const, overlap: 'overlapping' as const }, '(t,o)'],
       [{ coverage: 'partial' as const, overlap: 'disjoint' as const }, '(p,d)'],
-      [{ coverage: 'partial' as const, overlap: 'non-disjoint' as const }, '(p,nd)'],
+      [{ coverage: 'partial' as const, overlap: 'overlapping' as const }, '(p,o)'],
     ] as const;
     for (const [flags, text] of cases) {
       const drawing = describeDiagram(zoo(flags));

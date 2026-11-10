@@ -61,7 +61,7 @@ function sample(): ErDocument {
 describe('createEmptyDocument', () => {
   it('starts at the current version with nothing in it', () => {
     const document = createEmptyDocument();
-    expect(document.version).toBe(4);
+    expect(document.version).toBe(5);
     expect(document.model).toEqual({
       entities: [],
       attributes: [],
@@ -118,8 +118,8 @@ describe('addRelationship', () => {
   it('creates both ends with no cardinality chosen yet', () => {
     const relationship = findRelationship(sample().model, 'rel');
     expect(relationship?.ends).toEqual([
-      { entityId: 'pub', cardinality: null, participation: 'partial', role: null },
-      { entityId: 'book', cardinality: null, participation: 'partial', role: null },
+      { entityId: 'pub', cardinality: null, participation: 'partial', minMax: null, role: null },
+      { entityId: 'book', cardinality: null, participation: 'partial', minMax: null, role: null },
     ]);
   });
 

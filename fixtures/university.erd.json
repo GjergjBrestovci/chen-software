@@ -1,6 +1,7 @@
 {
-  "version": 4,
+  "version": 5,
   "title": "University",
+  "notation": "classic",
   "model": {
     "entities": [
       {
@@ -341,12 +342,14 @@
             "entityId": "ent_department",
             "cardinality": "1",
             "participation": "total",
+            "minMax": null,
             "role": null
           },
           {
             "entityId": "ent_course",
             "cardinality": "N",
             "participation": "total",
+            "minMax": null,
             "role": null
           }
         ]
@@ -360,12 +363,14 @@
             "entityId": "ent_student",
             "cardinality": "M",
             "participation": "partial",
+            "minMax": null,
             "role": null
           },
           {
             "entityId": "ent_course",
             "cardinality": "N",
             "participation": "partial",
+            "minMax": null,
             "role": null
           }
         ]
@@ -379,18 +384,21 @@
             "entityId": "ent_student",
             "cardinality": "M",
             "participation": "partial",
+            "minMax": null,
             "role": null
           },
           {
             "entityId": "ent_course",
             "cardinality": "N",
             "participation": "partial",
+            "minMax": null,
             "role": null
           },
           {
             "entityId": "ent_semester",
             "cardinality": "1",
             "participation": "partial",
+            "minMax": null,
             "role": null
           }
         ]
@@ -404,12 +412,14 @@
             "entityId": "ent_employee",
             "cardinality": "1",
             "participation": "partial",
+            "minMax": null,
             "role": "supervisor"
           },
           {
             "entityId": "ent_employee",
             "cardinality": "N",
             "participation": "partial",
+            "minMax": null,
             "role": "supervisee"
           }
         ]

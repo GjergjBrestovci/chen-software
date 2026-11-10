@@ -452,12 +452,12 @@ describe('specialization operations', () => {
       superId: 'person',
       subIds: ['student', 'teacher'],
       coverage: 'total',
-      overlap: 'non-disjoint',
+      overlap: 'overlapping',
       position: origin,
     });
     expect(document.model.specializations[0]).toMatchObject({
       coverage: 'total',
-      overlap: 'non-disjoint',
+      overlap: 'overlapping',
     });
   });
 
@@ -628,10 +628,10 @@ describe('specialization operations', () => {
 
   it('changes coverage and overlap as one undoable field set', () => {
     let document = setSpecializationCoverage(withIsa(), 'isa', 'total');
-    document = setSpecializationOverlap(document, 'isa', 'non-disjoint');
+    document = setSpecializationOverlap(document, 'isa', 'overlapping');
     expect(document.model.specializations[0]).toMatchObject({
       coverage: 'total',
-      overlap: 'non-disjoint',
+      overlap: 'overlapping',
     });
     expect(() => setSpecializationCoverage(withIsa(), 'ghost', 'total')).toThrow(ModelError);
     expect(() => setSpecializationOverlap(withIsa(), 'ghost', 'disjoint')).toThrow(ModelError);

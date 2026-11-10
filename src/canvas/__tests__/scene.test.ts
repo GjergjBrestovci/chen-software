@@ -361,8 +361,20 @@ describe('buildScene is defensive about references', () => {
             name: 'nowhere',
             kind: 'regular',
             ends: [
-              { entityId: 'ghost', cardinality: null, participation: 'partial', role: null },
-              { entityId: 'alsoGhost', cardinality: null, participation: 'partial', role: null },
+              {
+                entityId: 'ghost',
+                cardinality: null,
+                participation: 'partial',
+                minMax: null,
+                role: null,
+              },
+              {
+                entityId: 'alsoGhost',
+                cardinality: null,
+                participation: 'partial',
+                minMax: null,
+                role: null,
+              },
             ],
           },
         ],
