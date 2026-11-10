@@ -5,7 +5,7 @@ import { TitleField } from './TitleField';
 
 /**
  * Every button carries a label and a tooltip naming its shortcut, and the
- * relationship and snap toggles report their state through `aria-pressed`
+ * relationship, snap and notation toggles report their state through `aria-pressed`
  * rather than colour alone (SPEC.md §10).
  */
 export interface ToolbarProps {
@@ -20,12 +20,14 @@ export interface ToolbarProps {
   onToggleRelationshipMode: () => void;
   onDeleteSelection: () => void;
   onToggleSnap: () => void;
+  onToggleMinMax: () => void;
   onToggleTheme: () => void;
   theme: Theme;
   onUndo: () => void;
   onRedo: () => void;
   relationshipModeActive: boolean;
   snapToGrid: boolean;
+  minMaxNotation: boolean;
   canAddAttribute: boolean;
   canDelete: boolean;
   canUndo: boolean;
@@ -168,6 +170,11 @@ export function Toolbar(props: ToolbarProps): ReactElement {
       <label className="chen-toolbar-toggle">
         <input type="checkbox" checked={props.snapToGrid} onChange={props.onToggleSnap} />
         {toolbar.snapToGrid}
+      </label>
+
+      <label className="chen-toolbar-toggle" title={toolbar.minMaxNotationHint}>
+        <input type="checkbox" checked={props.minMaxNotation} onChange={props.onToggleMinMax} />
+        {toolbar.minMaxNotation}
       </label>
 
       <button

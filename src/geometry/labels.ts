@@ -21,9 +21,18 @@ export interface CardinalityLabelOptions {
   maxEdgeFraction?: number;
   /** How far to push the label off the line. */
   perpendicularOffset?: number;
+  /**
+   * The label's text. When given, a label too wide for `perpendicularOffset`,
+   * such as `(17,36)` beside a steep line, is pushed further out so it never
+   * sits on the line.
+   */
+  text?: string;
 }
 
-const DEFAULTS: Required<CardinalityLabelOptions> = {
+/** Room left between a measured label and its line. */
+const LABEL_LINE_CLEARANCE = 3;
+
+const DEFAULTS: Required<Omit<CardinalityLabelOptions, 'text'>> = {
   distanceFromEntity: 20,
   maxEdgeFraction: 0.35,
   perpendicularOffset: 12,
@@ -152,7 +161,18 @@ export function endLabelPlacement(
   );
   const attachment = pointAlongEdge(segment, travelled);
   const normal = sideNormal(direction, options.side ?? 'auto');
-  const position = add(attachment, scale(normal, settings.perpendicularOffset));
+  const offset =
+    options.text === undefined
+      ? settings.perpendicularOffset
+      : Math.max(
+          settings.perpendicularOffset,
+          halfExtentAlong(
+            normal,
+            measureTextWidth(options.text, CARDINALITY_FONT_SIZE),
+            textLineHeight(CARDINALITY_FONT_SIZE),
+          ) + LABEL_LINE_CLEARANCE,
+        );
+  const position = add(attachment, scale(normal, offset));
 
   if (role === null) {
     return { position, attachment, rolePosition: null };
@@ -164,10 +184,7 @@ export function endLabelPlacement(
     textLineHeight(ROLE_FONT_SIZE),
   );
   const roleClearance = options.roleClearance ?? DEFAULT_ROLE_CLEARANCE;
-  const rolePosition = add(
-    attachment,
-    scale(normal, settings.perpendicularOffset + roleClearance + reach),
-  );
+  const rolePosition = add(attachment, scale(normal, offset + roleClearance + reach));
 
   return { position, attachment, rolePosition };
 }
