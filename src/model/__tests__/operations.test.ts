@@ -14,6 +14,8 @@ import {
   setAttributeIdentifier,
   setAttributeShape,
   setCardinality,
+  setMinMax,
+  setNotation,
   setTitle,
 } from '../operations';
 import { attributesOf, findAttribute, findEntity, findRelationship } from '../queries';
@@ -329,6 +331,68 @@ describe('setCardinality', () => {
     expect(() =>
       setCardinality(sample(), { relationshipId: 'ghost', endIndex: 0, cardinality: '1' }),
     ).toThrow(ModelError);
+  });
+});
+
+describe('setMinMax', () => {
+  it('sets one end and leaves its classic cardinality alone', () => {
+    let document = setCardinality(sample(), {
+      relationshipId: 'rel',
+      endIndex: 0,
+      cardinality: '1',
+    });
+    document = setMinMax(document, {
+      relationshipId: 'rel',
+      endIndex: 0,
+      minMax: { min: 0, max: 'n' },
+    });
+    const ends = findRelationship(document.model, 'rel')?.ends;
+    expect(ends?.map((end) => end.minMax)).toEqual([{ min: 0, max: 'n' }, null]);
+    expect(ends?.[0]?.cardinality).toBe('1');
+  });
+
+  it('clears a pair back to undecided', () => {
+    let document = setMinMax(sample(), {
+      relationshipId: 'rel',
+      endIndex: 1,
+      minMax: { min: 1, max: 1 },
+    });
+    document = setMinMax(document, { relationshipId: 'rel', endIndex: 1, minMax: null });
+    expect(findRelationship(document.model, 'rel')?.ends[1]?.minMax).toBeNull();
+  });
+
+  it('rejects a pair the course would not write', () => {
+    expect(() =>
+      setMinMax(sample(), { relationshipId: 'rel', endIndex: 0, minMax: { min: 3, max: 1 } }),
+    ).toThrow(ModelError);
+  });
+
+  it('rejects an unknown relationship or end', () => {
+    expect(() =>
+      setMinMax(sample(), { relationshipId: 'ghost', endIndex: 0, minMax: null }),
+    ).toThrow(ModelError);
+    expect(() => setMinMax(sample(), { relationshipId: 'rel', endIndex: 5, minMax: null })).toThrow(
+      ModelError,
+    );
+  });
+});
+
+describe('setNotation', () => {
+  it('switches the notation and keeps every value of both', () => {
+    let document = setCardinality(sample(), {
+      relationshipId: 'rel',
+      endIndex: 0,
+      cardinality: 'N',
+    });
+    document = setMinMax(document, {
+      relationshipId: 'rel',
+      endIndex: 0,
+      minMax: { min: 1, max: 'n' },
+    });
+    const switched = setNotation(document, 'min-max');
+    expect(switched.notation).toBe('min-max');
+    expect(switched.model).toEqual(document.model);
+    expect(setNotation(switched, 'classic').notation).toBe('classic');
   });
 });
 

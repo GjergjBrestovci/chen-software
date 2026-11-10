@@ -3,6 +3,7 @@ import { messages } from '../i18n/messages.en';
 import { createColumnSpec } from './column';
 import { parseDismissalKey } from './dismissals';
 import { ModelError } from './errors';
+import { formatMinMax, isValidMinMax } from './minMax';
 import { createPresentation } from './presentation';
 import {
   allElementIds,
@@ -31,6 +32,8 @@ import type {
   ErDocument,
   ErModel,
   Id,
+  MinMax,
+  Notation,
   Participation,
   Position,
   Relationship,
@@ -365,6 +368,38 @@ export function setCardinality(document: ErDocument, params: SetCardinalityParam
     if (end) {
       end.cardinality = params.cardinality;
     }
+  });
+}
+
+export interface SetMinMaxParams {
+  relationshipId: Id;
+  endIndex: number;
+  /** `null` clears the pair back to undecided. */
+  minMax: MinMax | null;
+}
+
+export function setMinMax(document: ErDocument, params: SetMinMaxParams): ErDocument {
+  const relationship = findRelationship(document.model, params.relationshipId);
+  if (!relationship) {
+    throw new ModelError(`Unknown relationship "${params.relationshipId}".`);
+  }
+  endAt(relationship, params.endIndex);
+  if (params.minMax !== null && !isValidMinMax(params.minMax)) {
+    throw new ModelError(`Invalid (min,max) pair ${formatMinMax(params.minMax)}.`);
+  }
+
+  return produce(document, (draft) => {
+    const end = findRelationship(draft.model, params.relationshipId)?.ends[params.endIndex];
+    if (end) {
+      end.minMax = params.minMax === null ? null : { ...params.minMax };
+    }
+  });
+}
+
+/** Switches the labels every end shows. Neither notation's values are touched. */
+export function setNotation(document: ErDocument, notation: Notation): ErDocument {
+  return produce(document, (draft) => {
+    draft.notation = notation;
   });
 }
 

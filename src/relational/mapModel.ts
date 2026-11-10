@@ -1,5 +1,6 @@
 import { messages } from '../i18n/messages.en';
 import { createColumnSpec, isIntegerType, takesLength, takesPrecision } from '../model/column';
+import { classicEnds } from '../model/minMax';
 import { attributesOf, findEntity, isaConstraintText, specializationOfSub } from '../model/queries';
 import type {
   Attribute,
@@ -7,6 +8,7 @@ import type {
   Entity,
   ErModel,
   Id,
+  Notation,
   Relationship,
   RelationshipEnd,
 } from '../model/types';
@@ -28,7 +30,10 @@ import type { Column, RelationalSchema, Table } from './types';
  * - a multivalued attribute becomes a table of its own;
  * - a binary relationship with a `1` end becomes a foreign key on the other
  *   side (UNIQUE when both ends are `1`); any other relationship becomes a
- *   table of foreign keys whose primary key leaves out one `1` end.
+ *   table of foreign keys whose primary key leaves out one `1` end;
+ * - in the min-max notation, the pairs are first read as classic
+ *   cardinalities and participations (`model/minMax.ts`), so both notations
+ *   map the same way.
  *
  * It never refuses. A diagram mid-assignment still exports (SPEC.md §1,
  * product rule 4), and every guess made about it is recorded as a note.
@@ -99,7 +104,10 @@ class SchemaBuilder {
   private readonly keyed = new Set<Id>();
   private readonly keying = new Set<Id>();
 
-  constructor(private readonly model: ErModel) {}
+  constructor(
+    private readonly model: ErModel,
+    private readonly notation: Notation,
+  ) {}
 
   build(): RelationalSchema {
     for (const entity of this.model.entities) {
@@ -442,9 +450,14 @@ class SchemaBuilder {
       ? nameOr(relationship.name, text.unnamedRelationshipLabel)
       : this.addRelationshipTable(relationship).name;
     for (const end of relationship.ends) {
-      if (end.cardinality === null) {
+      if (this.notation === 'min-max' && end.minMax === null) {
+        this.notes.push(text.missingMinMax(label, this.endName(end)));
+      } else if (this.notation === 'classic' && end.cardinality === null) {
         this.notes.push(text.missingCardinality(label, this.endName(end)));
       }
+    }
+    if (this.notation === 'min-max' && relationship.ends.length > 2) {
+      this.notes.push(text.minMaxManyEnds(label));
     }
     if (binaryWithOne) {
       this.addBinaryForeignKey(relationship, first, second);
@@ -618,6 +631,23 @@ class SchemaBuilder {
   }
 }
 
-export function mapModel(model: ErModel): RelationalSchema {
-  return new SchemaBuilder(model).build();
+/** The model with every end's classic cardinality and participation as `notation` reads them. */
+function inClassicTerms(model: ErModel, notation: Notation): ErModel {
+  if (notation === 'classic') {
+    return model;
+  }
+  return {
+    ...model,
+    relationships: model.relationships.map((relationship) => {
+      const classic = classicEnds(relationship, notation);
+      return {
+        ...relationship,
+        ends: relationship.ends.map((end, index) => ({ ...end, ...classic[index] })),
+      };
+    }),
+  };
+}
+
+export function mapModel(model: ErModel, notation: Notation = 'classic'): RelationalSchema {
+  return new SchemaBuilder(inClassicTerms(model, notation), notation).build();
 }

@@ -76,6 +76,13 @@ export const messages = {
     cardinalityHint: 'Click to change: 1, N, M',
     cardinalityUnsetLabel: 'Cardinality not set yet. Click to choose.',
     cardinalitySetLabel: (value: string): string => `Cardinality ${value}. Click to change.`,
+    minMaxHint: 'Click to type a (min,max) pair, such as 0,n or 1,3',
+    minMaxUnsetLabel: '(min,max) not set yet. Click to type it.',
+    minMaxSetLabel: (value: string): string => `(min,max) ${value}. Click to change.`,
+    minMaxFieldLabel: '(min,max) pair',
+    minMaxPlaceholder: '0,n',
+    minMaxInvalid:
+      'Type two numbers, such as 1,3, or a number and n. max must be at least 1 and at least min.',
     selfRelationshipRejected: 'A relationship needs two different entities.',
     relationshipNeedsEntities: 'Relationships connect two entities. Pick an entity.',
     pickFirstEntity: 'Pick the first entity.',
@@ -120,6 +127,10 @@ export const messages = {
       `Two tables would be called ${wanted}, so one became ${name}.`,
     missingCardinality: (relationship: string, entity: string): string =>
       `${relationship} has no cardinality on the ${entity} end, so it was treated as many.`,
+    missingMinMax: (relationship: string, entity: string): string =>
+      `${relationship} has no (min,max) on the ${entity} end, so it was treated as (0,n).`,
+    minMaxManyEnds: (relationship: string): string =>
+      `${relationship} has three or more ends, so its table is keyed on all of them; (min,max) pairs cannot say which ends a combination of the others determines.`,
     isaConstraints: (entity: string, constraints: string): string =>
       `${entity} is split into subclasses ${constraints}, but MySQL cannot enforce those constraints on the subclass tables.`,
     derivedLeftOut: (attribute: string, table: string): string =>
@@ -259,6 +270,9 @@ export const messages = {
     redo: 'Redo',
     redoShortcut: 'Ctrl+Shift+Z',
     snapToGrid: 'Snap to grid',
+    minMaxNotation: '(min,max)',
+    minMaxNotationHint:
+      'Write (min,max) pairs on the relationship ends instead of 1, N and M. Both are kept.',
     darkTheme: 'Switch between light and dark',
     darkMode: 'Dark',
     lightMode: 'Light',

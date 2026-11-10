@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { messages } from '../../i18n/messages.en';
 import { mapModel } from '../mapModel';
+import type { ErModel, MinMax } from '../../model/types';
 import { column, columnNames, Diagram, table } from './diagram';
 
 const text = messages.sql;
@@ -661,6 +662,74 @@ describe('binary relationships with a 1 end', () => {
         ).model,
     );
     expect(columnNames(table(schema, 'NODE'))).toEqual(['id', 'node_id']);
+  });
+});
+
+describe('the min-max notation', () => {
+  /** CUSTOMER (custMin,custMax) — places — (orderMin,orderMax) ORDER. */
+  function placing(customer: MinMax | null, order: MinMax | null): ErModel {
+    return new Diagram()
+      .entity('CUSTOMER')
+      .key('customer_id', 'CUSTOMER')
+      .entity('ORDER')
+      .key('order_id', 'ORDER')
+      .relationship('places', [
+        ['CUSTOMER', { cardinality: null, minMax: customer }],
+        ['ORDER', { cardinality: null, minMax: order }],
+      ]).model;
+  }
+
+  it('puts the foreign key on the side whose max is 1', () => {
+    const schema = mapModel(placing({ min: 0, max: 'n' }, { min: 1, max: 1 }), 'min-max');
+    expect(schema.tables.map((t) => t.name)).toEqual(['CUSTOMER', 'ORDER']);
+    const order = table(schema, 'ORDER');
+    expect(columnNames(order)).toEqual(['order_id', 'customer_id']);
+    expect(order.foreignKeys[0]).toMatchObject({ columns: ['customer_id'], table: 'CUSTOMER' });
+    expect(schema.notes).toEqual([]);
+  });
+
+  it('makes the key NOT NULL only when min is at least 1', () => {
+    const mandatory = mapModel(placing({ min: 0, max: 'n' }, { min: 1, max: 1 }), 'min-max');
+    expect(column(table(mandatory, 'ORDER'), 'customer_id').notNull).toBe(true);
+    const optional = mapModel(placing({ min: 0, max: 'n' }, { min: 0, max: 1 }), 'min-max');
+    expect(column(table(optional, 'ORDER'), 'customer_id').notNull).toBe(false);
+  });
+
+  it('builds a table when both maxima are above 1', () => {
+    const schema = mapModel(placing({ min: 0, max: 'n' }, { min: 2, max: 5 }), 'min-max');
+    expect(table(schema, 'places').primaryKey).toEqual(['customer_id', 'order_id']);
+  });
+
+  it('ignores the classic cardinalities, and the classic notation ignores the pairs', () => {
+    const model = placing({ min: 0, max: 'n' }, { min: 1, max: 1 });
+    expect(table(mapModel(model, 'min-max'), 'ORDER').foreignKeys).toHaveLength(1);
+    // Both classic cardinalities are undecided, so classic mapping builds a table.
+    expect(mapModel(model, 'classic').tables.map((t) => t.name)).toContain('places');
+  });
+
+  it('notes an end with no pair', () => {
+    const schema = mapModel(placing({ min: 0, max: 'n' }, null), 'min-max');
+    expect(schema.notes).toEqual([text.missingMinMax('places', 'ORDER')]);
+  });
+
+  it('notes that a ternary relationship is keyed on all its ends', () => {
+    const schema = mapModel(
+      new Diagram()
+        .entity('A')
+        .key('a_id', 'A')
+        .entity('B')
+        .key('b_id', 'B')
+        .entity('C')
+        .key('c_id', 'C')
+        .relationship('abc', [
+          ['A', { minMax: { min: 1, max: 1 } }],
+          ['B', { minMax: { min: 0, max: 'n' } }],
+          ['C', { minMax: { min: 0, max: 'n' } }],
+        ]).model,
+      'min-max',
+    );
+    expect(table(schema, 'abc').primaryKey).toEqual(['a_id', 'b_id', 'c_id']);
+    expect(schema.notes).toEqual([text.minMaxManyEnds('abc')]);
   });
 });
 

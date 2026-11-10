@@ -111,6 +111,33 @@ describe('parseErDocument rejects malformed files', () => {
     );
   });
 
+  it('accepts a (min,max) pair with no upper limit', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        at(at(document.model.relationships, 0).ends, 0).minMax = { min: 0, max: 'n' };
+      }),
+    );
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('rejects a (min,max) pair whose max is below its min', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        at(at(document.model.relationships, 0).ends, 0).minMax = { min: 3, max: 1 };
+      }),
+    );
+    expect(outcome.ok).toBe(false);
+  });
+
+  it('rejects an unknown notation', () => {
+    const outcome = parseErDocument(
+      corrupted((document) => {
+        (document as { notation: string }).notation = 'crow';
+      }),
+    );
+    expect(outcome.ok).toBe(false);
+  });
+
   it('accepts a ternary relationship', () => {
     const outcome = parseErDocument(
       corrupted((document) => {

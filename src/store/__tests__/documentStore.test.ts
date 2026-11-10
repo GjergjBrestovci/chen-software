@@ -48,6 +48,19 @@ describe('documentStore', () => {
     expect(store().document.model.entities).toEqual(before);
   });
 
+  it('switches the notation as one undoable step, and ignores a switch to the same one', () => {
+    const before = useDocumentStore.temporal.getState().pastStates.length;
+    store().setNotation('classic');
+    expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before);
+
+    store().setNotation('min-max');
+    expect(store().document.notation).toBe('min-max');
+    expect(useDocumentStore.temporal.getState().pastStates).toHaveLength(before + 1);
+
+    useDocumentStore.temporal.getState().undo();
+    expect(store().document.notation).toBe('classic');
+  });
+
   it('creates a relationship with both cardinalities undecided', () => {
     const a = store().addEntityAt({ x: 0, y: 0 });
     const b = store().addEntityAt({ x: 400, y: 0 });

@@ -23,7 +23,10 @@ export { DEFAULT_SQL_OPTIONS } from './sqlOptions';
 export function buildSql(document: ErDocument, options: SqlOptions): SqlExport {
   const title =
     document.title.trim().length > 0 ? document.title.trim() : messages.document.untitled;
-  return renderMysql(mapModel(document.model), { title, dropExisting: options.dropExisting });
+  return renderMysql(mapModel(document.model, document.notation), {
+    title,
+    dropExisting: options.dropExisting,
+  });
 }
 
 /** Hands the SQL to the browser as a download named after the diagram. */
