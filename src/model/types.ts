@@ -149,7 +149,7 @@ export interface Relationship {
 export type SpecializationOverlap = 'disjoint' | 'overlapping';
 
 /**
- * The ISA triangle: one superclass split into two or more subclasses that
+ * The ISA triangle: one superclass specialized into one or more subclasses that
  * share its identity (data modelling lesson 'IS-A Relationships & Min-Max').
  * The two constraints are independent, so every combination — (t,d), (t,o),
  * (p,d), (p,o) — is expressible. They live on the node, not on the links,
@@ -159,7 +159,7 @@ export interface Specialization {
   id: Id;
   /** The entity the subclasses share. One superclass is split at most once. */
   superId: Id;
-  /** At least two, unique. Each subclass belongs to exactly one specialization. */
+  /** At least one, unique. Each subclass belongs to exactly one specialization. */
   subIds: Id[];
   /** `total`: every superclass instance is in at least one subclass. */
   coverage: Participation;
