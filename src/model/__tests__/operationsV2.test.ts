@@ -467,12 +467,22 @@ describe('specialization operations', () => {
     );
   });
 
-  it('refuses fewer than two subclasses', () => {
+  it('accepts a single subclass', () => {
+    const document = addSpecialization(zoo(), {
+      id: 'isa',
+      superId: 'person',
+      subIds: ['student'],
+      position: origin,
+    });
+    expect(document.model.specializations[0]?.subIds).toEqual(['student']);
+  });
+
+  it('refuses an empty list of subclasses', () => {
     expect(() =>
       addSpecialization(zoo(), {
         id: 'isa',
         superId: 'person',
-        subIds: ['student'],
+        subIds: [],
         position: origin,
       }),
     ).toThrow(ModelError);
@@ -618,8 +628,14 @@ describe('specialization operations', () => {
     expect(document.model.specializations[0]?.subIds).toEqual(['student', 'teacher']);
   });
 
-  it('refuses to detach below two subclasses', () => {
-    expect(() => removeSpecializationSub(withIsa(), 'isa', 'student')).toThrow(ModelError);
+  it('detaches down to a single subclass', () => {
+    const document = removeSpecializationSub(withIsa(), 'isa', 'student');
+    expect(document.model.specializations[0]?.subIds).toEqual(['teacher']);
+  });
+
+  it('refuses to detach the last subclass', () => {
+    const single = removeSpecializationSub(withIsa(), 'isa', 'student');
+    expect(() => removeSpecializationSub(single, 'isa', 'teacher')).toThrow(ModelError);
   });
 
   it('refuses to detach something that is not a subclass', () => {

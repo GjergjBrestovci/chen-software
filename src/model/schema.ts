@@ -80,7 +80,7 @@ const relationshipSchema = z.strictObject({
 const specializationSchema = z.strictObject({
   id: idSchema,
   superId: idSchema,
-  subIds: z.array(idSchema).min(2),
+  subIds: z.array(idSchema).min(1),
   coverage: z.enum(['partial', 'total']),
   overlap: z.enum(['disjoint', 'non-disjoint']),
 });

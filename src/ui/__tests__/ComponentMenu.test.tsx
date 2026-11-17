@@ -478,9 +478,23 @@ describe('specialization from a selection', () => {
     }
   });
 
-  it('hides the candidates below three selected entities', () => {
+  it('offers a one-to-one ISA for two selected entities', async () => {
+    const user = userEvent.setup();
     const { person, student } = threeEntities();
     openAll([person, student]);
+    renderMenu();
+
+    await user.click(screen.getByRole('menuitem', { name: 'PERSON' }));
+
+    expect(store().document.model.specializations[0]).toMatchObject({
+      superId: person,
+      subIds: [student],
+    });
+  });
+
+  it('hides the candidates for a single selected entity', () => {
+    const { person } = threeEntities();
+    openAll([person]);
     renderMenu();
     expect(screen.queryByRole('group', { name: 'Generalization' })).not.toBeInTheDocument();
   });
@@ -585,15 +599,18 @@ describe('specialization menu', () => {
     expect(findSpecialization(store().document.model, specId)?.subIds).toEqual([student, teacher]);
   });
 
-  it('refuses to detach below two subclasses, with a notice', async () => {
+  it('refuses to detach the last subclass, with a notice', async () => {
     const user = userEvent.setup();
     const { student, teacher, specId } = isa();
+    act(() => {
+      store().detachSpecializationSub(specId, student);
+    });
 
     openOn(specId);
     renderMenu();
-    await user.click(screen.getByRole('menuitem', { name: 'STUDENT' }));
+    await user.click(screen.getByRole('menuitem', { name: 'TEACHER' }));
 
-    expect(findSpecialization(store().document.model, specId)?.subIds).toEqual([student, teacher]);
+    expect(findSpecialization(store().document.model, specId)?.subIds).toEqual([teacher]);
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 });

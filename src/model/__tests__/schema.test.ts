@@ -405,8 +405,15 @@ describe('parseErDocument checks specializations', () => {
     }
   });
 
-  it('rejects a specialization with fewer than two subclasses', () => {
-    expectRejected(withSpecializations(specialization({ subIds: ['ent_author'] })));
+  it('accepts a specialization with a single subclass', () => {
+    const outcome = parseErDocument(
+      withSpecializations(specialization({ subIds: ['ent_author'] })),
+    );
+    expect(outcome.ok).toBe(true);
+  });
+
+  it('rejects a specialization with no subclasses', () => {
+    expectRejected(withSpecializations(specialization({ subIds: [] })));
   });
 
   it('rejects a specialization that lists the same subclass twice', () => {

@@ -450,13 +450,13 @@ export function removeRelationshipEnd(
   });
 }
 
-/** Subclasses fewer than this and a split is no longer a split. */
-export const MIN_SPECIALIZATION_SUBS = 2;
+/** An ISA needs at least one subclass below its superclass. */
+export const MIN_SPECIALIZATION_SUBS = 1;
 
 export interface AddSpecializationParams {
   id: Id;
   superId: Id;
-  /** Subclasses, two or more, no repeats. */
+  /** Subclasses, one or more, no repeats. */
   subIds: readonly Id[];
   coverage?: Participation;
   overlap?: SpecializationOverlap;
@@ -476,7 +476,7 @@ function requireIsaEntity(model: ErModel, id: Id, role: string): Entity {
 }
 
 /**
- * Splits one superclass into two or more subclasses. The structural rules
+ * Specializes one superclass into one or more subclasses. The structural rules
  * (arity, no repeats, one split per superclass, one node per subclass, no
  * cycles, weak out) guard the same invariant the file format enforces, so
  * no operation can produce a document the importer would reject.
@@ -488,7 +488,7 @@ export function addSpecialization(
   assertIdIsFree(document, params.id);
 
   if (params.subIds.length < MIN_SPECIALIZATION_SUBS) {
-    throw new ModelError('A specialization must split into at least two subclasses.');
+    throw new ModelError('A specialization needs at least one subclass.');
   }
   if (new Set(params.subIds).size !== params.subIds.length) {
     throw new ModelError('A specialization must not list the same subclass twice.');
@@ -564,7 +564,7 @@ export function removeSpecializationSub(document: ErDocument, specId: Id, subId:
     throw new ModelError(`"${subId}" is not a subclass of "${specId}".`);
   }
   if (spec.subIds.length <= MIN_SPECIALIZATION_SUBS) {
-    throw new ModelError('A specialization must keep at least two subclasses.');
+    throw new ModelError('A specialization must keep at least one subclass.');
   }
 
   return produce(document, (draft) => {

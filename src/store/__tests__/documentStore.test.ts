@@ -358,9 +358,9 @@ describe('specialization actions', () => {
     expect(pastLength()).toBe(before + 2);
   });
 
-  it('refuses to detach the third subclass from a two-way split', () => {
-    const { person, student, teacher } = three();
-    const isa = store().addSpecializationFrom(person, [student, teacher]);
+  it('refuses to detach the last subclass', () => {
+    const { person, student } = three();
+    const isa = store().addSpecializationFrom(person, [student]);
     expect(() => {
       store().detachSpecializationSub(isa, student);
     }).toThrow();

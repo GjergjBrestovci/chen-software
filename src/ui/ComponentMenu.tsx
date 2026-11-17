@@ -100,7 +100,7 @@ function SpecializationFromSelection({
   const notify = useUiStore((state) => state.notify);
   const setSelectedIds = useUiStore((state) => state.setSelectedIds);
 
-  // A split is one superclass plus two subclasses: fewer selections cannot.
+  // An ISA is one superclass plus at least one subclass.
   if (items.length < MIN_SPECIALIZATION_SUBS + 1) {
     return null;
   }
@@ -190,7 +190,7 @@ function SpecializationSection({
                 label={label}
                 onSelect={() => {
                   if (node.subIds.length <= MIN_SPECIALIZATION_SUBS) {
-                    notify(messages.menu.detachNeedsTwo);
+                    notify(messages.menu.detachNeedsOne);
                     return;
                   }
                   detachSpecializationSub(node.id, subId);
